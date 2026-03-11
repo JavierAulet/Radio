@@ -1,0 +1,40 @@
+# Node modules
+node_modules/
+npm-debug.log
+
+# Build files
+dist/
+build/
+.next/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database
+radio.db
+backend/radio.db
+
+# Music & Uploads
+# (We don't want to track audio files in git as they are large)
+backend/music/*.mp3
+backend/music/*.wav
+backend/music/*.flac
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
