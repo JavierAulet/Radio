@@ -423,9 +423,9 @@ setTimeout(playNextAutoDjTrack, 2000);
 
 // Timestamp del último dato recibido del DJ (0 = no hay DJ activo)
 let lastDjDataAt = 0;
-const DJ_DATA_TIMEOUT_MS = 10000; // 10s sin datos → DJ considerado desconectado
+const DJ_DATA_TIMEOUT_MS = 6000; // 6s sin datos → DJ considerado desconectado
 
-// Watchdog: comprueba cada 3s
+// Watchdog: comprueba cada 2s
 setInterval(() => {
     // AutoDJ muerto sin razón → reiniciar
     if (!radioState.isDjLive && autoDjTimer === null && playlist.length > 0) {
@@ -444,7 +444,7 @@ setInterval(() => {
         io.emit('systemMessage', { text: "🎙️ El DJ se ha desconectado. Regresando a la programación habitual.", isError: false });
         playNextAutoDjTrack();
     }
-}, 3000);
+}, 2000);
 
 // Endpoint Lector (Oyentes)
 app.get('/stream', (req, res) => {
