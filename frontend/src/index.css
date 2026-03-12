@@ -94,21 +94,19 @@ body {
 /* ─── CLICK OVERLAY ─── */
 .click-overlay {
   position: fixed;
-  top: 0; left: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh; /* dynamic viewport — iOS/Android no corta el contenido */
+  inset: 0;
   z-index: 9999;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  padding: env(safe-area-inset-top, 1rem) 1.5rem env(safe-area-inset-bottom, 1rem);
+  padding: 2rem;
   box-sizing: border-box;
   background: rgba(0,0,0,0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
-  overflow: hidden;
 }
 .click-circle {
   width: 88px; height: 88px; border-radius: 50%;
