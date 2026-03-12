@@ -820,8 +820,9 @@ socket.emit('listenersCount', currentListeners);
 });
 
 // Catch-all: cualquier ruta no-API sirve index.html (React Router)
+// Nota: Express 5 no soporta '*' en app.get — usar app.use sin ruta
 if (fs.existsSync(distPath)) {
-    app.get('*', (req, res) => {
+    app.use((req, res) => {
         res.sendFile(path.join(distPath, 'index.html'));
     });
 }
