@@ -421,13 +421,30 @@ loadPlaylist();
 loadAds();
 setTimeout(playNextAutoDjTrack, 2000);
 
-// Watchdog: si el AutoDJ debería estar corriendo pero el timer murió, lo reinicia
+// Timestamp del último dato recibido del DJ (0 = no hay DJ activo)
+let lastDjDataAt = 0;
+const DJ_DATA_TIMEOUT_MS = 10000; // 10s sin datos → DJ considerado desconectado
+
+// Watchdog: comprueba cada 3s
 setInterval(() => {
+    // AutoDJ muerto sin razón → reiniciar
     if (!radioState.isDjLive && autoDjTimer === null && playlist.length > 0) {
-        console.warn('AutoDJ Watchdog: timer muerto, reiniciando...');
+        console.warn('Watchdog: AutoDJ timer muerto, reiniciando...');
+        playNextAutoDjTrack();
+        return;
+    }
+    // DJ "live" pero sin datos por más de 10s → forzar desconexión
+    if (radioState.isDjLive && lastDjDataAt > 0 && Date.now() - lastDjDataAt > DJ_DATA_TIMEOUT_MS) {
+        console.warn('Watchdog: DJ timeout sin datos — forzando desconexión y reiniciando AutoDJ');
+        lastDjDataAt = 0;
+        radioState.isDjLive = false;
+        radioState.djName = null;
+        radioState.currentSong = "Cargando AutoDJ...";
+        io.emit('radioData', radioState);
+        io.emit('systemMessage', { text: "🎙️ El DJ se ha desconectado. Regresando a la programación habitual.", isError: false });
         playNextAutoDjTrack();
     }
-}, 5000);
+}, 3000);
 
 // Endpoint Lector (Oyentes)
 app.get('/stream', (req, res) => {
@@ -543,22 +560,26 @@ async function handleBroadcast(req, res) {
 
     let isDisconnected = false;
 
+    // Marcar cuándo llega el primer dato del DJ
+    lastDjDataAt = Date.now();
+
     const endConnection = () => {
         if (isDisconnected) return;
         isDisconnected = true;
+        lastDjDataAt = 0;
         console.log('🎙️ === DJ DESCONECTADO: RETORNANDO A AutoDJ === 🎙️');
         radioState.isDjLive = false;
         radioState.djName = null;
         radioState.currentSong = "Cargando AutoDJ...";
         io.emit('radioData', radioState);
         io.emit('systemMessage', { text: "🎙️ El DJ se ha desconectado. Regresando a la programación habitual.", isError: false });
-        // No need to adjust index; queue-based AutoDJ picks next song automatically
         playNextAutoDjTrack();
         try { socket.destroy(); } catch(e) {}
     };
 
     // Ahora el socket es nuestro — recibimos el stream de audio directamente
     socket.on('data', (chunk) => {
+        lastDjDataAt = Date.now(); // actualizar timestamp con cada chunk recibido
         activeListeners.forEach(clientRes => {
             try { clientRes.write(chunk); } catch(e) {}
         });
