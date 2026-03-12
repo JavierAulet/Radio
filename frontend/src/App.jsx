@@ -5,11 +5,10 @@ import { io } from 'socket.io-client';
 import DjDashboard from './DjDashboard';
 import AdminDashboard from './AdminDashboard';
 
-// Detecta el host dinámicamente para que funcione tanto en localhost
-// como cuando otros usuarios acceden desde una IP o dominio diferente
-const BACKEND = `${window.location.protocol}//${window.location.hostname}:8000`;
-const socket = io(BACKEND);
-const STREAM_URL = `${BACKEND}/stream`;
+// URLs relativas: en dev Vite proxea /api, /stream y /socket.io al backend (puerto 8000).
+// En producción Express sirve el frontend y el backend en el mismo origen/puerto.
+const socket = io();
+const STREAM_URL = '/stream';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 

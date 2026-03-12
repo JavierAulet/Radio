@@ -11,6 +11,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Servir el frontend compilado en producción
+const distPath = path.join(__dirname, '../frontend/dist');
+if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+}
+
 const multer = require('multer');
 const musicDir = path.join(__dirname, 'music');
 const adDir    = path.join(__dirname, 'ads');
@@ -812,6 +818,13 @@ socket.emit('listenersCount', currentListeners);
       }
   });
 });
+
+// Catch-all: cualquier ruta no-API sirve index.html (React Router)
+if (fs.existsSync(distPath)) {
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+}
 
 const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => {

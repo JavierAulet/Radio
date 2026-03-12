@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Radio, Key, HardDrive, Music, CheckCircle, AlertTriangle, Calendar, Clock, User, ArrowLeft, Users, Copy, Check, Headphones, Trash2 } from 'lucide-react';
 
-const BACKEND = `${window.location.protocol}//${window.location.hostname}:8000`;
+const BACKEND = '';
 
 export default function DjDashboard({ socket }) {
   const [username, setUsername] = useState('');

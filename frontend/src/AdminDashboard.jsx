@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Music, UserPlus, Trash2, UploadCloud, Users, Server, Radio, ArrowLeft, Search, SkipForward, Headphones, Key, User, Megaphone } from 'lucide-react';
 
-const BACKEND = `${window.location.protocol}//${window.location.hostname}:8000`;
+const BACKEND = '';
 
 export default function AdminDashboard({ socket }) {
   const [adminUser, setAdminUser] = useState('');
