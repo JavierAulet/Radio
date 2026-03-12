@@ -221,8 +221,8 @@ export default function DjDashboard({ socket }) {
           </h3>
           
           {[
-            { label: 'Servidor', value: 'localhost', key: 'host' },
-            { label: 'Puerto', value: '8000', key: 'port' },
+            { label: 'Servidor', value: window.location.hostname, key: 'host' },
+            { label: 'Puerto', value: window.location.port || (window.location.protocol === 'https:' ? '443' : '80'), key: 'port' },
             { label: 'Punto de Montaje', value: '/broadcast', key: 'mount' },
             { label: 'Usuario', value: username, key: 'user' },
           ].map(item => (

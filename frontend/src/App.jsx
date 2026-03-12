@@ -238,18 +238,27 @@ socket.on('radioData',           d => {
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const isStandalone = window.navigator.standalone === true ||
       window.matchMedia('(display-mode: standalone)').matches;
-    if (isStandalone) return; // ya instalada
+    if (isStandalone) return;
+
     if (isIOS) {
       setShowIosBanner(true);
       return;
     }
-    const handler = (e) => {
-      e.preventDefault();
-      setInstallPrompt(e);
+
+    // El evento puede haber ocurrido antes de que React montara el componente
+    if (window.__pwaPrompt) {
+      setInstallPrompt(window.__pwaPrompt);
       setShowInstallBanner(true);
+    }
+
+    const handler = () => {
+      if (window.__pwaPrompt) {
+        setInstallPrompt(window.__pwaPrompt);
+        setShowInstallBanner(true);
+      }
     };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener('pwaPromptReady', handler);
+    return () => window.removeEventListener('pwaPromptReady', handler);
   }, []);
 
   const handleInstall = async () => {
