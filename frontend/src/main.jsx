@@ -14,19 +14,13 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
-    // Desregistrar SWs viejos (sin ?v=) — migración única
+    // Limpiar todos los SWs y caches anteriores
     const regs = await navigator.serviceWorker.getRegistrations();
-    for (const reg of regs) {
-      const url = reg.active?.scriptURL || reg.installing?.scriptURL || '';
-      if (!url.includes('?v=')) await reg.unregister();
-    }
-    // Limpiar todas las caches viejas
+    await Promise.all(regs.map(r => r.unregister()));
     const keys = await caches.keys();
     await Promise.all(keys.map(k => caches.delete(k)));
-
-    // Registrar nuevo SW versionado
-    navigator.serviceWorker.register(`/sw.js?v=${__BUILD_TIME__}`)
-      .catch(() => {});
+    // Registrar SW mínimo (solo para PWA instalable)
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
 
