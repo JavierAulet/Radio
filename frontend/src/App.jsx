@@ -369,7 +369,7 @@ socket.on('radioData',           d => {
           {/* Song info */}
           <div className="song-info">
             <img
-              src="/logo.png"
+              src="/favicon.png"
               alt="Album Art"
               className={`album-art ${isPlaying ? 'playing' : ''}`}
             />
