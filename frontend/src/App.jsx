@@ -93,12 +93,24 @@ const [radioInfo, setRadioInfo]   = useState({ isDjLive: false, djName: null, cu
     if (!audioRef.current) return;
     const audio = audioRef.current;
 
+    const isStandalone = window.navigator.standalone === true ||
+      window.matchMedia('(display-mode: standalone)').matches;
+
     srcChangedAt.current = Date.now();
     audio.src = `${STREAM_URL}?t=${Date.now()}`;
     audio.volume = 0.7;
     audio.play()
       .then(() => { setIsPlaying(true); setNeedsClick(false); })
-      .catch(() => { setNeedsClick(true); });
+      .catch(() => {
+        // En PWA standalone el autoplay suele funcionar; solo mostrar overlay en browser normal
+        if (!isStandalone) setNeedsClick(true);
+        else {
+          // Reintento tras un pequeño delay (el SW puede estar arrancando)
+          setTimeout(() => {
+            audio.play().then(() => { setIsPlaying(true); }).catch(() => { setNeedsClick(true); });
+          }, 800);
+        }
+      });
 
     const onError = () => {
       // Ignorar errores generados por cambio de src (MEDIA_ERR_ABORTED)

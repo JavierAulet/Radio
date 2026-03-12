@@ -421,6 +421,14 @@ loadPlaylist();
 loadAds();
 setTimeout(playNextAutoDjTrack, 2000);
 
+// Watchdog: si el AutoDJ debería estar corriendo pero el timer murió, lo reinicia
+setInterval(() => {
+    if (!radioState.isDjLive && autoDjTimer === null && playlist.length > 0) {
+        console.warn('AutoDJ Watchdog: timer muerto, reiniciando...');
+        playNextAutoDjTrack();
+    }
+}, 5000);
+
 // Endpoint Lector (Oyentes)
 app.get('/stream', (req, res) => {
   // Enviar cabeceras inmediatamente evitando que el navegador espere un fin
