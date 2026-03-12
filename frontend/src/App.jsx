@@ -55,27 +55,31 @@ const [radioInfo, setRadioInfo]   = useState({ isDjLive: false, djName: null, cu
   const analyserRef    = useRef(null);
   const chatContainerRef = useRef(null);
   const isPlayingRef   = useRef(false);
+  const userHasInteracted = useRef(false); // true después del primer click real
+  const srcChangedAt   = useRef(0);        // timestamp del último cambio de src
 
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
-  // Auto-reconnect helper: reconnects the stream without resetting AudioContext
+  // Auto-reconnect helper
   const reconnectStream = useRef(null);
-  const reconnectTimer = useRef(null);
-  const reconnectCount = useRef(0);
-  const MAX_RECONNECTS = 5;
+  const reconnectTimer  = useRef(null);
+  const reconnectCount  = useRef(0);
+  const MAX_RECONNECTS  = 8;
 
   const doReconnect = () => {
-    if (!audioRef.current || !isPlayingRef.current) return;
+    // Solo reconectar si el usuario ya interactuó y no excedimos intentos
+    if (!audioRef.current || !userHasInteracted.current) return;
     if (reconnectCount.current >= MAX_RECONNECTS) return;
     clearTimeout(reconnectTimer.current);
     reconnectCount.current++;
     reconnectTimer.current = setTimeout(() => {
-      if (!audioRef.current || !isPlayingRef.current) return;
-      console.log(`[Radio] Reconnecting stream (${reconnectCount.current}/${MAX_RECONNECTS})…`);
+      if (!audioRef.current) return;
+      console.log(`[Radio] Reconectando stream (${reconnectCount.current}/${MAX_RECONNECTS})…`);
+      srcChangedAt.current = Date.now();
       audioRef.current.src = `${STREAM_URL}?t=${Date.now()}`;
       audioRef.current.load();
       audioRef.current.play().catch(() => {});
-    }, 3000); // wait 3s before reconnecting
+    }, 2000);
   };
   reconnectStream.current = doReconnect;
 
@@ -84,19 +88,20 @@ const [radioInfo, setRadioInfo]   = useState({ isDjLive: false, djName: null, cu
     if (!audioRef.current) return;
     const audio = audioRef.current;
 
+    srcChangedAt.current = Date.now();
     audio.src = `${STREAM_URL}?t=${Date.now()}`;
     audio.volume = 0.7;
     audio.play()
       .then(() => { setIsPlaying(true); setNeedsClick(false); })
-      .catch(() => { setNeedsClick(true); }); // navegador bloqueó autoplay
+      .catch(() => { setNeedsClick(true); });
 
-    // Only reconnect on actual fatal errors (NOT on 'stalled' — that fires
-    // during normal buffering pauses and would cause unnecessary reconnects)
     const onError = () => {
-      console.warn('[Radio] Stream error — will attempt reconnect');
+      // Ignorar errores generados por cambio de src (MEDIA_ERR_ABORTED)
+      // El navegador los dispara al cambiar audio.src, no son errores reales
+      if (Date.now() - srcChangedAt.current < 1000) return;
+      console.warn('[Radio] Stream error — reconectando');
       if (reconnectStream.current) reconnectStream.current();
     };
-    // Reset reconnect counter when stream is playing fine
     const onPlaying = () => { reconnectCount.current = 0; };
 
     audio.addEventListener('error', onError);
@@ -109,17 +114,23 @@ const [radioInfo, setRadioInfo]   = useState({ isDjLive: false, djName: null, cu
     };
   }, []);
 
-  // Siempre conexión fresca al hacer click — la conexión del intento de autoplay
-  // puede quedar stalled/errored en Chrome y Firefox, lo que hace que play() falle
-  // silenciosamente. Una nueva URL fuerza una petición limpia al servidor.
+  // Click para empezar — una vez interactuado, nunca volver al overlay
   const startFromClick = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    setNeedsClick(false); // ocultar overlay inmediatamente = feedback instantáneo
+    userHasInteracted.current = true;
+    setNeedsClick(false); // ocultar overlay inmediatamente
+    srcChangedAt.current = Date.now();
     audio.src = `${STREAM_URL}?t=${Date.now()}`;
     audio.play()
       .then(() => { setIsPlaying(true); })
-      .catch(() => { setNeedsClick(true); }); // si falla, mostrar overlay de nuevo
+      .catch(() => {
+        // Si falla incluso con gesto de usuario (muy raro), intentar de nuevo en 1s
+        setTimeout(() => {
+          if (!audioRef.current) return;
+          audioRef.current.play().catch(() => {});
+        }, 1000);
+      });
   };
 
   // Socket setup
