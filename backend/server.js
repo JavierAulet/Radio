@@ -5,7 +5,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 
-const { getUser, createUser, addXP, addSongRequest, getSongRequests, authenticateDj, getSchedules, addSchedule, deleteSchedule, getScheduleById, getAllDjs, createDj, deleteDj } = require('./database');
+const { getUser, createUser, addXP, authenticateDj, getSchedules, addSchedule, deleteSchedule, getScheduleById, getAllDjs, createDj, deleteDj } = require('./database');
 
 const app = express();
 app.use(cors());
@@ -13,16 +13,20 @@ app.use(express.json());
 
 const multer = require('multer');
 const musicDir = path.join(__dirname, 'music');
+const adDir    = path.join(__dirname, 'ads');
+if (!fs.existsSync(adDir)) fs.mkdirSync(adDir, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, musicDir)
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname)
-  }
+  destination: (req, file, cb) => cb(null, musicDir),
+  filename:    (req, file, cb) => cb(null, file.originalname)
 });
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
+
+const adStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, adDir),
+  filename:    (req, file, cb) => cb(null, file.originalname)
+});
+const uploadAd = multer({ storage: adStorage });
 
 const server = http.createServer((req, res) => {
     // Interceptar SOURCE/PUT antes de Express para compatibilidad IceCast pura
@@ -92,6 +96,20 @@ let autoDjTrackSize  = 0;      // total bytes in current track
 let autoDjByteRate   = 16000;  // bytes/sec for current track (updated per track)
 let autoDjTrackStart = 0;      // wall-clock ms when current track streaming began
 let autoDjBytesSent  = 0;      // bytes sent for current track so far
+
+// PUBLICIDAD / CUÑAS
+let adPlaylist       = [];     // Lista de archivos en backend/ads/
+let currentAdIndex   = 0;      // Índice de la próxima cuña a reproducir
+let isPlayingAd      = false;  // true mientras suena una cuña
+let adInterval       = 3;      // reproducir cuña cada N canciones (0 = desactivado)
+let songsSinceLastAd = 0;      // canciones reproducidas desde la última cuña
+
+const loadAds = () => {
+    adPlaylist = fs.existsSync(adDir)
+        ? fs.readdirSync(adDir).filter(f => f.endsWith('.mp3'))
+        : [];
+    console.log(`Publicidad: ${adPlaylist.length} cuñas cargadas.`);
+};
 
 // Detect MP3 bitrate by scanning frames from the file.
 // For VBR accuracy we use the file size / duration approach when possible,
@@ -302,40 +320,70 @@ const playNextAutoDjTrack = () => {
 
         // Cambio de pista inline — sin gap de silencio
         if (autoDjPos >= autoDjTrackSize) {
-            // Cerrar fd de la pista terminada
             if (autoDjFd !== null) { try { fs.closeSync(autoDjFd); } catch(e) {} autoDjFd = null; }
 
-            const nextFile = getNextTrack();
-            if (!nextFile) {
-                console.log('AutoDJ: No hay más canciones.');
-                clearInterval(autoDjTimer); autoDjTimer = null;
-                return;
-            }
+            // Si acabó una canción (no una cuña), incrementar contador
+            if (!isPlayingAd) songsSinceLastAd++;
 
-            try {
-                const trackPath = path.join(musicDir, nextFile);
-                const fd = fs.openSync(trackPath, 'r');
-                const size = fs.fstatSync(fd).size;
-                const byteRate = detectMp3ByteRate(fd);
-                const audioStart = detectAudioStart(fd);
-                console.log(`AutoDJ -> Play: ${nextFile} (${Math.round(byteRate * 8 / 1000)} kbps, audio@${audioStart})`);
+            // Decidir: ¿cuña o canción?
+            const timeForAd = adPlaylist.length > 0 && adInterval > 0 && songsSinceLastAd >= adInterval;
 
-                autoDjFd         = fd;
-                autoDjTrackSize  = size;
-                autoDjByteRate   = byteRate;
-                autoDjPos        = audioStart;
-                autoDjBytesSent  = 0;
-                autoDjTrackStart = Date.now();
-                currentTrackName = nextFile;
-                playedSongs.add(nextFile);
-                
-                const cleanName = cleanSongName(nextFile);
-                radioState.currentSong = cleanName;
-                addToHistory(cleanName);
-                io.emit('radioData', { ...radioState, history: songHistory });
-            } catch(e) {
-                console.error('AutoDJ: Error cambiando pista:', e.message);
-                return;
+            if (!isPlayingAd && timeForAd) {
+                // --- Reproducir cuña ---
+                const adFile = adPlaylist[currentAdIndex % adPlaylist.length];
+                currentAdIndex = (currentAdIndex + 1) % adPlaylist.length;
+                const adPath = path.join(adDir, adFile);
+                try {
+                    const fd   = fs.openSync(adPath, 'r');
+                    const size = fs.fstatSync(fd).size;
+                    const byteRate = detectMp3ByteRate(fd);
+                    console.log(`📢 Publicidad: ${adFile}`);
+                    autoDjFd         = fd;
+                    autoDjTrackSize  = size;
+                    autoDjByteRate   = byteRate;
+                    autoDjPos        = 0;
+                    autoDjBytesSent  = 0;
+                    autoDjTrackStart = Date.now();
+                    isPlayingAd      = true;
+                    songsSinceLastAd = 0;
+                    radioState.currentSong = '📢 Publicidad';
+                    io.emit('radioData', { ...radioState, history: songHistory });
+                } catch(e) {
+                    console.error('AutoDJ: Error abriendo cuña:', e.message);
+                    isPlayingAd = false;
+                }
+            } else {
+                // --- Reproducir siguiente canción ---
+                isPlayingAd = false;
+                const nextFile = getNextTrack();
+                if (!nextFile) {
+                    console.log('AutoDJ: No hay más canciones.');
+                    clearInterval(autoDjTimer); autoDjTimer = null;
+                    return;
+                }
+                try {
+                    const trackPath  = path.join(musicDir, nextFile);
+                    const fd         = fs.openSync(trackPath, 'r');
+                    const size       = fs.fstatSync(fd).size;
+                    const byteRate   = detectMp3ByteRate(fd);
+                    const audioStart = detectAudioStart(fd);
+                    console.log(`AutoDJ -> Play: ${nextFile} (${Math.round(byteRate * 8 / 1000)} kbps)`);
+                    autoDjFd         = fd;
+                    autoDjTrackSize  = size;
+                    autoDjByteRate   = byteRate;
+                    autoDjPos        = audioStart;
+                    autoDjBytesSent  = 0;
+                    autoDjTrackStart = Date.now();
+                    currentTrackName = nextFile;
+                    playedSongs.add(nextFile);
+                    const cleanName  = cleanSongName(nextFile);
+                    radioState.currentSong = cleanName;
+                    addToHistory(cleanName);
+                    io.emit('radioData', { ...radioState, history: songHistory });
+                } catch(e) {
+                    console.error('AutoDJ: Error cambiando pista:', e.message);
+                    return;
+                }
             }
         }
 
@@ -364,6 +412,7 @@ const playNextAutoDjTrack = () => {
 
 // Inicializar el AutoDJ
 loadPlaylist();
+loadAds();
 setTimeout(playNextAutoDjTrack, 2000);
 
 // Endpoint Lector (Oyentes)
@@ -656,6 +705,39 @@ app.delete('/api/admin/music/:filename', checkAdmin, (req, res) => {
     }
 });
 
+// --- PUBLICIDAD / CUÑAS ---
+
+app.get('/api/admin/ads', checkAdmin, (req, res) => {
+    loadAds();
+    res.json({ ads: adPlaylist, interval: adInterval });
+});
+
+app.post('/api/admin/ads/upload', checkAdmin, uploadAd.single('ad'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No se subió archivo' });
+    loadAds();
+    res.json({ success: true, filename: req.file.originalname });
+});
+
+app.delete('/api/admin/ads/:filename', checkAdmin, (req, res) => {
+    try {
+        const adPath = path.join(adDir, req.params.filename);
+        if (fs.existsSync(adPath)) fs.unlinkSync(adPath);
+        loadAds();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/ads/config', checkAdmin, (req, res) => {
+    const { interval } = req.body;
+    if (typeof interval === 'number' && interval >= 0) {
+        adInterval = Math.floor(interval);
+        songsSinceLastAd = 0; // reset counter when interval changes
+    }
+    res.json({ interval: adInterval });
+});
+
 app.post('/api/admin/skip', checkAdmin, (req, res) => {
     if (radioState.isDjLive) {
         return res.status(400).json({ error: 'No se puede saltar cuando hay DJ en vivo' });
@@ -676,9 +758,7 @@ io.on('connection', (socket) => {
       socket.emit('chatHistory', chatHistory);
       socket.emit('userData', user);
       
-      const requests = await getSongRequests();
-      socket.emit('initialSongRequests', requests);
-      socket.emit('listenersCount', currentListeners);
+socket.emit('listenersCount', currentListeners);
       socket.emit('radioData', { ...radioState, history: songHistory }); // Enviar estado del DJ/AutoDJ con historial
     } catch (e) {
       console.error('Error in join event:', e);
@@ -711,22 +791,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('requestSong', async (data) => {
-      try {
-          const user = await getUser(data.username);
-          if (user && user.level >= 5) {
-              await addSongRequest(user.id, data.song);
-              const requests = await getSongRequests();
-              io.emit('updateSongRequests', requests);
-          } else {
-              socket.emit('systemMessage', { text: "Necesitas ser Nivel 5 para pedir canciones. Sigue chateando!", isError: true });
-          }
-      } catch (e) {
-          console.error("Error asking for song request:", e);
-      }
-  });
-
-  // Evento especial para que el DJ actualice la canción actual
+// Evento especial para que el DJ actualice la canción actual
   // DjDashboard manda: { token (=password), songName, djName (opcional) }
   socket.on('updateCurrentSong', async (data) => {
       const { token, songName, username: djUser } = data;

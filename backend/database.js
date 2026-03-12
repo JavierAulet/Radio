@@ -18,16 +18,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
 
-      db.run(`CREATE TABLE IF NOT EXISTS song_requests (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        song_name TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(user_id) REFERENCES users(id)
-      )`);
-
-      db.run(`CREATE TABLE IF NOT EXISTS djs (
+db.run(`CREATE TABLE IF NOT EXISTS djs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
@@ -97,29 +88,6 @@ const addXP = (username, amount) => {
       });
     });
   });
-};
-
-const addSongRequest = (userId, songName) => {
-    return new Promise((resolve, reject) => {
-      db.run('INSERT INTO song_requests (user_id, song_name) VALUES (?, ?)', [userId, songName], function(err) {
-        if (err) reject(err);
-        resolve({ id: this.lastID, userId, songName, status: 'pending' });
-      });
-    });
-};
-
-const getSongRequests = () => {
-    return new Promise((resolve, reject) => {
-        db.all(`
-            SELECT sr.id, sr.song_name, sr.status, sr.created_at, u.username 
-            FROM song_requests sr
-            JOIN users u ON sr.user_id = u.id
-            ORDER BY sr.created_at DESC
-        `, [], (err, rows) => {
-            if (err) reject(err);
-            resolve(rows);
-        });
-    });
 };
 
 const authenticateDj = (username, password) => {
@@ -211,8 +179,6 @@ module.exports = {
   getUser,
   createUser,
   addXP,
-  addSongRequest,
-  getSongRequests,
   authenticateDj,
   getSchedules,
   addSchedule,

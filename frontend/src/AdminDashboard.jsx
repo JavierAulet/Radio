@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Shield, Music, UserPlus, Trash2, UploadCloud, Users, Server, Radio, ArrowLeft, Search, SkipForward, Headphones, Key, User } from 'lucide-react';
+import { Shield, Music, UserPlus, Trash2, UploadCloud, Users, Server, Radio, ArrowLeft, Search, SkipForward, Headphones, Key, User, Megaphone } from 'lucide-react';
 
 export default function AdminDashboard({ socket }) {
   const [adminUser, setAdminUser] = useState('');
@@ -20,6 +20,14 @@ export default function AdminDashboard({ socket }) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Ads Management
+  const [ads, setAds] = useState([]);
+  const [adInterval, setAdInterval] = useState(3);
+  const [adIntervalInput, setAdIntervalInput] = useState('3');
+  const [adIsDragging, setAdIsDragging] = useState(false);
+  const [adUploading, setAdUploading] = useState(false);
+  const adFileInputRef = useRef(null);
 
   // Radio state
   const [radioInfo, setRadioInfo] = useState({ isDjLive: false, djName: null, currentSong: 'Conectando...' });
@@ -42,6 +50,7 @@ export default function AdminDashboard({ socket }) {
         setIsAuthenticated(true);
         setDjs(await res.json());
         loadMusic();
+        loadAdsList();
         socket.emit('join', `Admin_${adminUser}`);
       } else {
         setStatusMsg('Acceso Denegado');
@@ -141,6 +150,64 @@ export default function AdminDashboard({ socket }) {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }
       });
     } catch (e) { alert("Error de red"); }
+  };
+
+  const loadAdsList = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/ads', { headers: authHeaders() });
+      const data = await res.json();
+      setAds(data.ads || []);
+      setAdInterval(data.interval);
+      setAdIntervalInput(String(data.interval));
+    } catch (err) { console.error(err); }
+  };
+
+  const uploadAds = async (files) => {
+    setAdUploading(true);
+    for (const file of files) {
+      if (!file.name.endsWith('.mp3')) continue;
+      const formData = new FormData();
+      formData.append('ad', file);
+      try {
+        await fetch('http://localhost:8000/api/admin/ads/upload', {
+          method: 'POST', headers: authHeaders(), body: formData
+        });
+      } catch (e) { console.error('Ad upload error:', e); }
+    }
+    setAdUploading(false);
+    loadAdsList();
+  };
+
+  const handleAdDrop = async (e) => {
+    e.preventDefault();
+    setAdIsDragging(false);
+    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.mp3'));
+    if (files.length > 0) await uploadAds(files);
+  };
+
+  const handleDeleteAd = async (filename) => {
+    if (!window.confirm(`¿Eliminar cuña "${filename}"?`)) return;
+    try {
+      await fetch(`http://localhost:8000/api/admin/ads/${encodeURIComponent(filename)}`, {
+        method: 'DELETE', headers: authHeaders()
+      });
+      loadAdsList();
+    } catch (e) { alert('Error de red'); }
+  };
+
+  const handleSaveAdInterval = async (e) => {
+    e.preventDefault();
+    const val = parseInt(adIntervalInput, 10);
+    if (isNaN(val) || val < 0) return;
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/ads/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ interval: val })
+      });
+      const data = await res.json();
+      setAdInterval(data.interval);
+    } catch (e) { alert('Error de red'); }
   };
 
   const filteredSongs = songs.filter(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -338,6 +405,64 @@ export default function AdminDashboard({ socket }) {
               {filteredSongs.length} de {songs.length} canciones
             </p>
           )}
+        </div>
+        {/* Ads Management */}
+        <div className="dashboard-card">
+          <h3 className="card-title" style={{ color: 'var(--accent-gold)' }}>
+            <Megaphone size={18} />
+            Publicidad / Cuñas
+          </h3>
+
+          {/* Interval config */}
+          <form onSubmit={handleSaveAdInterval} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Cuña cada</span>
+            <input
+              type="number" min="0" max="99" value={adIntervalInput}
+              onChange={e => setAdIntervalInput(e.target.value)}
+              className="chat-input" style={{ width: '60px', textAlign: 'center', padding: '0.4rem' }}
+            />
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>canciones</span>
+            <button type="submit" className="button-primary" style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem' }}>Guardar</button>
+          </form>
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', marginBottom: '1rem', fontFamily: 'var(--font-mono)' }}>
+            {adInterval === 0 ? '⏸ Publicidad desactivada' : `▶ Activa — cuña cada ${adInterval} canciones`}
+          </p>
+
+          {/* Upload drop zone */}
+          <div
+            className={`drop-zone ${adIsDragging ? 'dragging' : ''}`}
+            onDragOver={e => { e.preventDefault(); setAdIsDragging(true); }}
+            onDragLeave={() => setAdIsDragging(false)}
+            onDrop={handleAdDrop}
+            onClick={() => adFileInputRef.current?.click()}
+            style={{ marginBottom: '1rem' }}
+          >
+            <Megaphone size={24} color="var(--accent-gold)" style={{ marginBottom: '0.4rem', opacity: 0.7 }} />
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+              {adUploading ? 'Subiendo...' : adIsDragging ? '¡Suelta aquí!' : 'Arrastra cuñas MP3 o haz clic'}
+            </p>
+            <input ref={adFileInputRef} type="file" accept=".mp3,audio/mpeg" multiple style={{ display: 'none' }}
+              onChange={e => { uploadAds(Array.from(e.target.files)); adFileInputRef.current.value = ''; }} />
+          </div>
+
+          {/* Ads list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '200px', overflowY: 'auto' }}>
+            {ads.length === 0 && (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1rem', fontSize: '0.82rem' }}>
+                No hay cuñas cargadas
+              </p>
+            )}
+            {ads.map((ad, idx) => (
+              <div key={idx} className="list-item" style={{ padding: '0.55rem 0.85rem' }}>
+                <span style={{ fontSize: '0.82rem', wordBreak: 'break-all', paddingRight: '0.5rem', minWidth: 0 }}>
+                  📢 {ad.replace('.mp3', '')}
+                </span>
+                <button onClick={() => handleDeleteAd(ad)} className="delete-btn" title="Eliminar">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

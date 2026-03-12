@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Play, Pause, Volume2, VolumeX, MessageSquare, Music, Send, Share2, Plus, Settings, Radio, Users, Clock, Bell } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, MessageSquare, Send, Share2, Settings, Radio, Users, Clock, Bell } from 'lucide-react';
 import { io } from 'socket.io-client';
 import DjDashboard from './DjDashboard';
 import AdminDashboard from './AdminDashboard';
@@ -16,9 +16,7 @@ function RadioPlayer() {
   const [isMuted, setIsMuted]       = useState(false);
   const [chatMessages, setChatMessages]   = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
-  const [songRequests, setSongRequests]   = useState([]);
-  const [newRequest, setNewRequest] = useState('');
-  const [radioInfo, setRadioInfo]   = useState({ isDjLive: false, djName: null, currentSong: 'Conectando...' });
+const [radioInfo, setRadioInfo]   = useState({ isDjLive: false, djName: null, currentSong: 'Conectando...' });
   const [schedules, setSchedules]   = useState([]);
   const [username, setUsername]     = useState('');
   const [userLevel, setUserLevel]   = useState(1);
@@ -43,9 +41,12 @@ function RadioPlayer() {
   };
 
   const addToast = (text, type = 'info') => {
-    const id = Date.now() + Math.random();
-    setToasts(prev => [...prev.slice(-3), { id, text, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4500);
+    setToasts(prev => {
+      if (prev.some(t => t.text === text)) return prev; // no duplicates
+      const id = Date.now() + Math.random();
+      setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4500);
+      return [...prev.slice(-3), { id, text, type }];
+    });
   };
 
   const audioRef       = useRef(null);
@@ -135,9 +136,7 @@ function RadioPlayer() {
       }]);
       addToast(m.text, m.isError ? 'error' : 'info');
     });
-    socket.on('initialSongRequests', r => setSongRequests(r));
-    socket.on('updateSongRequests',  r => setSongRequests(r));
-    socket.on('radioData',           d => {
+socket.on('radioData',           d => {
       const prev = radioInfo.currentSong;
       setRadioInfo(d);
       if (d.currentSong && d.currentSong !== prev && d.currentSong !== 'Conectando...') {
@@ -151,8 +150,7 @@ function RadioPlayer() {
 
     return () => {
       socket.off('userData'); socket.off('chatHistory'); socket.off('newMessage');
-      socket.off('systemMessage'); socket.off('initialSongRequests');
-      socket.off('updateSongRequests'); socket.off('radioData'); socket.off('listenersCount');
+      socket.off('systemMessage'); socket.off('radioData'); socket.off('listenersCount');
     };
   }, []);
 
@@ -242,14 +240,7 @@ function RadioPlayer() {
     setCurrentMessage('');
   };
 
-  const requestSong = e => {
-    e.preventDefault();
-    if (!newRequest.trim()) return;
-    socket.emit('requestSong', { username, song: newRequest });
-    setNewRequest('');
-  };
-
-  // XP progress for next level
+// XP progress for next level
   const xpForLevel = lvl => lvl * 10;
   const xpProgress = Math.min(((userXp % 10) / 10) * 100, 100);
 
@@ -338,16 +329,13 @@ function RadioPlayer() {
             </div>
           </div>
 
-          {/* Station name bottom-left overlay */}
+          {/* Station logo bottom-left overlay */}
           {!isPlaying && (
             <div style={{
               position: 'absolute', bottom: '1rem', left: '1rem', zIndex: 15,
-              display: 'flex', flexDirection: 'column', gap: '0.2rem'
+              display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'flex-start'
             }}>
-              <span style={{
-                fontFamily: 'var(--font-display)', fontSize: '1.8rem',
-                fontWeight: 900, letterSpacing: '0.05em', lineHeight: 1
-              }} className="text-gradient">URBANOVA RADIO</span>
+              <img src="/logo.png" alt="Urbanova Radio" style={{ height: '56px', width: 'auto', objectFit: 'contain', filter: 'drop-shadow(0 0 8px rgba(0,243,255,0.4))' }} />
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.2em' }}>
                 24/7 · EN VIVO
               </span>
@@ -360,7 +348,7 @@ function RadioPlayer() {
           {/* Song info */}
           <div className="song-info">
             <img
-              src="https://images.unsplash.com/photo-1614113489855-66422ad300a4?auto=format&fit=crop&q=80&w=200"
+              src="/logo.png"
               alt="Album Art"
               className={`album-art ${isPlaying ? 'playing' : ''}`}
             />
@@ -461,7 +449,6 @@ function RadioPlayer() {
           {[
             { key: 'chat', label: 'Chat', icon: <MessageSquare size={14}/> },
             { key: 'history', label: 'Historial', icon: <Clock size={14}/> },
-            { key: 'requests', label: 'Peticiones', icon: <Music size={14}/> },
           ].map(t => (
             <button
               key={t.key}
@@ -577,80 +564,6 @@ function RadioPlayer() {
           </div>
         )}
 
-        {/* REQUESTS */}
-        {activeTab === 'requests' && (
-          <div className="requests-panel glass-panel" style={{ flex: 1 }}>
-            <div className="panel-header">
-              <Music size={14} /> Peticiones
-            </div>
-            <div className="panel-content">
-              {userLevel < 5 ? (
-                <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem' }}>
-                  <Music size={32} color="var(--text-subtle)" style={{ marginBottom: '0.75rem' }} />
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-                    Pedir canciones se desbloquea en <strong style={{ color: 'var(--neon-cyan)' }}>Nivel 5</strong>.
-                  </p>
-                  <p style={{ color: 'var(--text-subtle)', fontSize: '0.75rem', marginTop: '0.4rem' }}>
-                    ¡Chatea para ganar XP!
-                  </p>
-                  {/* XP progress bar */}
-                  <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', height: '6px' }}>
-                    <div style={{
-                      height: '100%', borderRadius: '8px',
-                      background: 'linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta))',
-                      width: `${xpProgress}%`, transition: 'width 0.5s ease'
-                    }} />
-                  </div>
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-subtle)', marginTop: '0.3rem' }}>
-                    Nivel {userLevel} · {userXp % 10}/10 XP
-                  </p>
-                </div>
-              ) : (
-                <form className="chat-input-container" style={{ margin: '0 0 0.75rem 0' }} onSubmit={requestSong}>
-                  <input
-                    type="text" className="chat-input"
-                    style={{ borderColor: 'rgba(255,0,229,0.3)' }}
-                    placeholder="Canción - Artista..."
-                    value={newRequest}
-                    onChange={e => setNewRequest(e.target.value)}
-                  />
-                  <button type="submit" className="btn-send" style={{ background: 'linear-gradient(135deg, var(--neon-cyan), #0066ff)' }}>
-                    <Plus size={14} />
-                  </button>
-                </form>
-              )}
-
-              {songRequests.map(req => (
-                <div key={req.id} className="glass-panel hover-glow" style={{
-                  padding: '0.7rem 0.9rem', fontSize: '0.85rem',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem'
-                }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{req.song_name}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      {req.username}
-                    </div>
-                  </div>
-                  <span style={{
-                    fontSize: '0.65rem', padding: '0.2rem 0.55rem', borderRadius: '6px', flexShrink: 0,
-                    fontFamily: 'var(--font-display)', letterSpacing: '0.05em', textTransform: 'uppercase',
-                    background: req.status === 'pending' ? 'rgba(240,180,41,0.12)' : 'rgba(0,255,136,0.12)',
-                    color: req.status === 'pending' ? 'var(--accent-gold)' : 'var(--neon-green)',
-                    border: `1px solid ${req.status === 'pending' ? 'rgba(240,180,41,0.3)' : 'rgba(0,255,136,0.3)'}`,
-                  }}>
-                    {req.status === 'pending' ? 'espera' : req.status}
-                  </span>
-                </div>
-              ))}
-
-              {songRequests.length === 0 && userLevel >= 5 && (
-                <div style={{ textAlign: 'center', color: 'var(--text-subtle)', fontSize: '0.8rem', marginTop: '1rem' }}>
-                  Sin peticiones en la cola.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </aside>
     </div>
   );
