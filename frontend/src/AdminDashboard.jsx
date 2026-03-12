@@ -37,7 +37,7 @@ export default function AdminDashboard({ socket }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:3000/api/admin/djs', { headers: authHeaders() });
+      const res = await fetch('http://localhost:8000/api/admin/djs', { headers: authHeaders() });
       if (res.ok) {
         setIsAuthenticated(true);
         setDjs(await res.json());
@@ -54,14 +54,14 @@ export default function AdminDashboard({ socket }) {
 
   const loadDjs = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/admin/djs', { headers: authHeaders() });
+      const res = await fetch('http://localhost:8000/api/admin/djs', { headers: authHeaders() });
       setDjs(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const loadMusic = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/admin/music', { headers: authHeaders() });
+      const res = await fetch('http://localhost:8000/api/admin/music', { headers: authHeaders() });
       setSongs(await res.json());
     } catch (err) { console.error(err); }
   };
@@ -69,7 +69,7 @@ export default function AdminDashboard({ socket }) {
   const handleCreateDj = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:3000/api/admin/djs', {
+      const res = await fetch('http://localhost:8000/api/admin/djs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ username: newDjUser, password: newDjPass, display_name: newDjName })
@@ -86,7 +86,7 @@ export default function AdminDashboard({ socket }) {
   const handleDeleteDj = async (id) => {
     if (!window.confirm("¿Eliminar este locutor y sus turnos programados?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/admin/djs/${id}`, {
+      const res = await fetch(`http://localhost:8000/api/admin/djs/${id}`, {
         method: 'DELETE', headers: authHeaders()
       });
       if (res.ok) loadDjs();
@@ -101,7 +101,7 @@ export default function AdminDashboard({ socket }) {
       const formData = new FormData();
       formData.append('song', file);
       try {
-        await fetch('http://localhost:3000/api/admin/music', {
+        await fetch('http://localhost:8000/api/admin/music', {
           method: 'POST', headers: authHeaders(), body: formData
         });
       } catch (e) { console.error('Upload error:', e); }
@@ -128,7 +128,7 @@ export default function AdminDashboard({ socket }) {
   const handleDeleteMusic = async (filename) => {
     if (!window.confirm(`¿Eliminar ${filename} del AutoDJ?`)) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/admin/music/${encodeURIComponent(filename)}`, {
+      const res = await fetch(`http://localhost:8000/api/admin/music/${encodeURIComponent(filename)}`, {
         method: 'DELETE', headers: authHeaders()
       });
       if (res.ok) loadMusic();
@@ -137,7 +137,7 @@ export default function AdminDashboard({ socket }) {
 
   const handleSkip = async () => {
     try {
-      await fetch('http://localhost:3000/api/admin/skip', {
+      await fetch('http://localhost:8000/api/admin/skip', {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }
       });
     } catch (e) { alert("Error de red"); }
@@ -294,7 +294,6 @@ export default function AdminDashboard({ socket }) {
             Música AutoDJ
           </h3>
           
-          {/* Drop Zone */}
           <div 
             className={`drop-zone ${isDragging ? 'dragging' : ''}`}
             onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
@@ -311,13 +310,11 @@ export default function AdminDashboard({ socket }) {
             <input ref={fileInputRef} type="file" accept=".mp3,audio/mpeg" multiple style={{ display: 'none' }} onChange={handleUploadMusic} />
           </div>
 
-          {/* Search */}
           <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
             <Search size={14} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-subtle)' }} />
             <input type="text" placeholder="Buscar canción..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="search-input" />
           </div>
 
-          {/* Song List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '250px', overflowY: 'auto' }}>
             {filteredSongs.length === 0 && (
               <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1rem', fontSize: '0.82rem' }}>

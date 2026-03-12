@@ -38,7 +38,7 @@ export default function DjDashboard({ socket }) {
 
   const loadSchedules = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/schedules');
+      const res = await fetch('http://localhost:8000/api/schedules');
       const data = await res.json();
       setSchedules(data);
     } catch (e) { console.error("Error loading schedules"); }
@@ -47,7 +47,7 @@ export default function DjDashboard({ socket }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:3000/api/dj/login', {
+      const res = await fetch('http://localhost:8000/api/dj/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -71,7 +71,7 @@ export default function DjDashboard({ socket }) {
   const handleBookSlot = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:3000/api/schedules', {
+      const res = await fetch('http://localhost:8000/api/schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, day_of_week: dayOfWeek, start_time: startTime, end_time: endTime, show_name: showName })
@@ -90,7 +90,7 @@ export default function DjDashboard({ socket }) {
   const handleDeleteSchedule = async (id) => {
     if (!window.confirm('¿Eliminar este turno?')) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/schedules/${id}`, {
+      const res = await fetch(`http://localhost:8000/api/schedules/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -220,7 +220,7 @@ export default function DjDashboard({ socket }) {
           
           {[
             { label: 'Servidor', value: 'localhost', key: 'host' },
-            { label: 'Puerto', value: '3000', key: 'port' },
+            { label: 'Puerto', value: '8000', key: 'port' },
             { label: 'Punto de Montaje', value: '/broadcast', key: 'mount' },
             { label: 'Usuario', value: username, key: 'user' },
           ].map(item => (
@@ -268,7 +268,6 @@ export default function DjDashboard({ socket }) {
             <span>Calendario Semanal</span>
           </h3>
 
-          {/* Booking Form - compact row */}
           <form onSubmit={handleBookSlot} style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '1.25rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{ flex: '1 1 120px', minWidth: 0 }}>
               <label style={{ fontSize: '0.65rem', color: 'var(--text-subtle)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '0.3rem' }}>Día</label>
@@ -294,43 +293,17 @@ export default function DjDashboard({ socket }) {
             {calMsg && <span style={{ color: 'var(--neon-green)', fontSize: '0.78rem', width: '100%', textAlign: 'center' }}>{calMsg}</span>}
           </form>
 
-          {/* Weekly Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem', minHeight: '320px' }}>
             {[1, 2, 3, 4, 5, 6, 0].map(dayIdx => {
               const today = new Date().getDay();
               const isToday = dayIdx === today;
               const daySchedules = schedules.filter(s => s.day_of_week === dayIdx);
-              
               return (
-                <div key={dayIdx} style={{ 
-                  background: isToday ? 'rgba(0, 243, 255, 0.04)' : 'rgba(0,0,0,0.15)',
-                  border: `1px solid ${isToday ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255,255,255,0.04)'}`,
-                  borderRadius: '10px',
-                  padding: '0.6rem 0.5rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.4rem',
-                  transition: 'border-color 0.3s',
-                  minHeight: '280px'
-                }}>
-                  {/* Day Header */}
+                <div key={dayIdx} style={{ background: isToday ? 'rgba(0, 243, 255, 0.04)' : 'rgba(0,0,0,0.15)', border: `1px solid ${isToday ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255,255,255,0.04)'}`, borderRadius: '10px', padding: '0.6rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', transition: 'border-color 0.3s', minHeight: '280px' }}>
                   <div style={{ textAlign: 'center', paddingBottom: '0.5rem', borderBottom: `1px solid ${isToday ? 'rgba(0, 243, 255, 0.15)' : 'rgba(255,255,255,0.04)'}` }}>
-                    <div style={{ 
-                      fontSize: '0.7rem', 
-                      fontFamily: 'var(--font-display)', 
-                      fontWeight: 700, 
-                      letterSpacing: '0.08em',
-                      color: isToday ? 'var(--neon-cyan)' : 'var(--text-muted)',
-                      textTransform: 'uppercase'
-                    }}>
-                      {DAYS_SHORT[dayIdx]}
-                    </div>
-                    {isToday && (
-                      <div style={{ fontSize: '0.58rem', color: 'var(--neon-cyan)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem', opacity: 0.7 }}>HOY</div>
-                    )}
+                    <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-display)', fontWeight: 700, letterSpacing: '0.08em', color: isToday ? 'var(--neon-cyan)' : 'var(--text-muted)', textTransform: 'uppercase' }}>{DAYS_SHORT[dayIdx]}</div>
+                    {isToday && <div style={{ fontSize: '0.58rem', color: 'var(--neon-cyan)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem', opacity: 0.7 }}>HOY</div>}
                   </div>
-
-                  {/* Scheduled Shows */}
                   {daySchedules.length === 0 ? (
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', fontStyle: 'italic' }}>Libre</span>
@@ -340,46 +313,17 @@ export default function DjDashboard({ socket }) {
                       const isMine = sch.username === username;
                       const accentColor = isMine ? 'var(--neon-magenta)' : 'var(--neon-cyan)';
                       return (
-                        <div key={sch.id} style={{
-                          background: isMine ? 'rgba(255, 0, 229, 0.08)' : 'rgba(0, 243, 255, 0.05)',
-                          border: `1px solid ${isMine ? 'rgba(255, 0, 229, 0.2)' : 'rgba(0, 243, 255, 0.12)'}`,
-                          borderRadius: '8px',
-                          padding: '0.5rem',
-                          position: 'relative',
-                          transition: 'transform 0.2s, box-shadow 0.2s',
-                          cursor: isMine ? 'default' : 'default'
-                        }}
-                        onMouseOver={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = `0 0 12px ${isMine ? 'rgba(255,0,229,0.15)' : 'rgba(0,243,255,0.1)'}` }}
-                        onMouseOut={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none' }}
-                        >
-                          {/* Time */}
-                          <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: accentColor, fontWeight: 600, marginBottom: '0.25rem' }}>
-                            {sch.start_time} - {sch.end_time}
-                          </div>
-                          {/* Show Name */}
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-main)', fontWeight: 500, lineHeight: 1.3, wordBreak: 'break-word' }}>
-                            {sch.show_name}
-                          </div>
-                          {/* DJ Name */}
-                          <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.3rem', fontFamily: 'var(--font-mono)' }}>
-                            {sch.display_name}
-                          </div>
-                          {/* Delete button (own shows only) */}
+                        <div key={sch.id} style={{ background: isMine ? 'rgba(255, 0, 229, 0.08)' : 'rgba(0, 243, 255, 0.05)', border: `1px solid ${isMine ? 'rgba(255, 0, 229, 0.2)' : 'rgba(0, 243, 255, 0.12)'}`, borderRadius: '8px', padding: '0.5rem', position: 'relative', transition: 'transform 0.2s, box-shadow 0.2s' }}
+                          onMouseOver={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = `0 0 12px ${isMine ? 'rgba(255,0,229,0.15)' : 'rgba(0,243,255,0.1)'}` }}
+                          onMouseOut={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none' }}>
+                          <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: accentColor, fontWeight: 600, marginBottom: '0.25rem' }}>{sch.start_time} - {sch.end_time}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-main)', fontWeight: 500, lineHeight: 1.3, wordBreak: 'break-word' }}>{sch.show_name}</div>
+                          <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.3rem', fontFamily: 'var(--font-mono)' }}>{sch.display_name}</div>
                           {isMine && (
-                            <button 
-                              onClick={() => handleDeleteSchedule(sch.id)}
-                              style={{ 
-                                position: 'absolute', top: '4px', right: '4px',
-                                background: 'transparent', border: 'none', cursor: 'pointer',
-                                color: 'var(--text-subtle)', padding: '2px', borderRadius: '4px',
-                                display: 'flex', alignItems: 'center', transition: 'color 0.2s'
-                              }}
+                            <button onClick={() => handleDeleteSchedule(sch.id)} style={{ position: 'absolute', top: '4px', right: '4px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', padding: '2px', borderRadius: '4px', display: 'flex', alignItems: 'center', transition: 'color 0.2s' }}
                               onMouseOver={e => e.currentTarget.style.color = '#ff4444'}
                               onMouseOut={e => e.currentTarget.style.color = 'var(--text-subtle)'}
-                              title="Eliminar turno"
-                            >
-                              <Trash2 size={11} />
-                            </button>
+                              title="Eliminar turno"><Trash2 size={11} /></button>
                           )}
                         </div>
                       );
