@@ -724,8 +724,8 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => {
-  console.log(`🚀 Servidor backend de Radio Online corriendo en http://localhost:${PORT}`);
+  console.log(`🚀 Servidor backend de Urbanova Radio corriendo en http://localhost:${PORT}`);
   console.log(`🎧 Endpoint de Escucha: GET http://localhost:${PORT}/stream`);
 });

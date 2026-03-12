@@ -1,6 +1,6 @@
-# 📻 Radio Online — Estación En Vivo 24/7
+# 📻 Urbanova Radio — Estación En Vivo 24/7
 
-Plataforma completa de radio online con AutoDJ, transmisión en vivo, chat en tiempo real, sistema de peticiones, y paneles de administración. Construida con Node.js + React.
+Plataforma completa de Urbanova Radio con AutoDJ, transmisión en vivo, chat en tiempo real, sistema de peticiones, y paneles de administración. Construida con Node.js + React.
 
 ---
 

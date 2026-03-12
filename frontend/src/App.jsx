@@ -307,7 +307,7 @@ function RadioPlayer() {
               <span style={{
                 fontFamily: 'var(--font-display)', fontSize: '1.8rem',
                 fontWeight: 900, letterSpacing: '0.05em', lineHeight: 1
-              }} className="text-gradient">RADIO ONLINE</span>
+              }} className="text-gradient">URBANOVA RADIO</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.2em' }}>
                 24/7 · EN VIVO
               </span>
@@ -355,7 +355,7 @@ function RadioPlayer() {
                 }
               </button>
               <button className="btn-icon" title="Compartir" onClick={() => {
-                if (navigator.share) navigator.share({ title: 'Radio Online', url: window.location.href });
+                if (navigator.share) navigator.share({ title: 'Urbanova Radio', url: window.location.href });
               }}>
                 <Share2 size={18} />
               </button>
