@@ -184,6 +184,46 @@ socket.on('radioData',           d => {
     };
   }, []);
 
+  // Crossfade suave cuando cambia la fuente (AutoDJ ↔ DJ en vivo)
+  const prevIsDjLive = useRef(null);
+  useEffect(() => {
+    // Ignorar el estado inicial (primer render)
+    if (prevIsDjLive.current === null) {
+      prevIsDjLive.current = radioInfo.isDjLive;
+      return;
+    }
+    if (prevIsDjLive.current === radioInfo.isDjLive) return;
+    prevIsDjLive.current = radioInfo.isDjLive;
+
+    if (!audioRef.current || !isPlayingRef.current) return;
+
+    const audio = audioRef.current;
+    const targetVolume = audio.volume || volume;
+    const STEP = 0.05;
+    const INTERVAL = 30; // ms por step → ~600ms fade completo
+
+    // Fade out
+    let currentVol = targetVolume;
+    const fadeOut = setInterval(() => {
+      currentVol = Math.max(0, currentVol - STEP);
+      audio.volume = currentVol;
+      if (currentVol <= 0) {
+        clearInterval(fadeOut);
+        // Reconectar al stream ya con la nueva fuente activa
+        srcChangedAt.current = Date.now();
+        audio.src = `${STREAM_URL}?t=${Date.now()}`;
+        audio.play().catch(() => {});
+        // Fade in
+        let vol2 = 0;
+        const fadeIn = setInterval(() => {
+          vol2 = Math.min(targetVolume, vol2 + STEP);
+          audio.volume = vol2;
+          if (vol2 >= targetVolume) clearInterval(fadeIn);
+        }, INTERVAL);
+      }
+    }, INTERVAL);
+  }, [radioInfo.isDjLive]);
+
   // Auto-scroll chat
   useEffect(() => {
     if (chatContainerRef.current)
