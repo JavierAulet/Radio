@@ -1,62 +1,68 @@
-const CACHE_NAME = 'urbanova-v1';
+// CACHE_NAME incluye el parámetro ?v= de la URL del SW (único por build)
+const params = new URL(self.scriptURL).searchParams;
+const CACHE_NAME = 'urbanova-' + (params.get('v') || 'dev');
 
-// Assets estáticos a cachear en la instalación
-const PRECACHE_ASSETS = [
-  '/',
-  '/manifest.json',
-  '/favicon.png',
-  '/logo.png'
-];
-
-// Nunca cachear estas rutas — siempre red
 const NETWORK_ONLY = ['/stream', '/socket.io', '/api', '/broadcast'];
 
 const isNetworkOnly = (url) => {
-  const { pathname } = new URL(url);
-  return NETWORK_ONLY.some(p => pathname.startsWith(p));
+  try {
+    const { pathname } = new URL(url);
+    return NETWORK_ONLY.some(p => pathname.startsWith(p));
+  } catch { return false; }
 };
 
-// Instalación: precachear assets críticos
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_ASSETS))
-  );
+// Instalación: activar inmediatamente sin esperar
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// Activación: limpiar caches antiguas
+// Activación: eliminar TODAS las caches anteriores y tomar control
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Fetch: cache-first para assets, network-only para stream/api/socket
+// Fetch: network-first para HTML (siempre versión nueva), cache-first para assets
 self.addEventListener('fetch', (event) => {
-  // Solo interceptar GET
   if (event.request.method !== 'GET') return;
-
-  // Stream, API, socket.io → siempre red (nunca cachear)
   if (isNetworkOnly(event.request.url)) return;
 
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        // Solo cachear respuestas válidas de mismo origen
-        if (
-          response.ok &&
-          response.type === 'basic' &&
-          event.request.url.startsWith(self.location.origin)
-        ) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      });
-    })
-  );
+  const isHTML = event.request.headers.get('accept')?.includes('text/html');
+
+  if (isHTML) {
+    // Network-first para HTML: siempre intenta la red primero
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+  } else {
+    // Cache-first para assets estáticos (JS, CSS, imágenes)
+    event.respondWith(
+      caches.match(event.request).then(cached => {
+        if (cached) return cached;
+        return fetch(event.request).then(response => {
+          if (response.ok && response.type === 'basic') {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+          }
+          return response;
+        });
+      })
+    );
+  }
+});
+
+// Cuando el SW detecta una nueva versión, notifica a todos los clientes para recargar
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });

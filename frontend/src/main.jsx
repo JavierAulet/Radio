@@ -14,7 +14,20 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register(`/sw.js?v=${__BUILD_TIME__}`)
+      .then(reg => {
+        // Si hay una nueva versión esperando, activarla y recargar
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          newSW?.addEventListener('statechange', () => {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              newSW.postMessage('SKIP_WAITING');
+              window.location.reload();
+            }
+          });
+        });
+      })
+      .catch(() => {});
   });
 }
 

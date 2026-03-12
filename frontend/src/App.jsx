@@ -432,7 +432,7 @@ function RadioPlayer() {
               </div>
               <div className="top-info">
                 <div className="top-name">{a.artist_name}</div>
-                <div className="top-artist">{a.plays} reproducciones</div>
+
               </div>
               <div className="top-plays" style={{ color: 'var(--neon-magenta)' }}>🎤</div>
             </div>
