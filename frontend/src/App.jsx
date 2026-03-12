@@ -27,6 +27,9 @@ const [radioInfo, setRadioInfo]   = useState({ isDjLive: false, djName: null, cu
   const [activeTab, setActiveTab]   = useState('chat'); // 'chat' | 'requests' | 'history'
   const [needsClick, setNeedsClick] = useState(false);
   const [toasts, setToasts]         = useState([]);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [showIosBanner, setShowIosBanner] = useState(false);
 
   // Unique color per username from a curated palette
   const USER_COLORS = [
@@ -230,6 +233,33 @@ socket.on('radioData',           d => {
     return () => cancelAnimationFrame(raf);
   }, [isPlaying]);
 
+  // PWA install prompt
+  useEffect(() => {
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone === true ||
+      window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) return; // ya instalada
+    if (isIOS) {
+      setShowIosBanner(true);
+      return;
+    }
+    const handler = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setShowInstallBanner(false);
+    setInstallPrompt(null);
+  };
+
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -369,7 +399,7 @@ socket.on('radioData',           d => {
           {/* Song info */}
           <div className="song-info">
             <img
-              src="/favicon.png"
+              src="/logo.png"
               alt="Album Art"
               className={`album-art ${isPlaying ? 'playing' : ''}`}
             />
@@ -586,6 +616,58 @@ socket.on('radioData',           d => {
         )}
 
       </aside>
+
+      {/* Banner instalación Android */}
+      {showInstallBanner && (
+        <div style={{
+          position: 'fixed', bottom: '1.2rem', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(10,10,15,0.97)', border: '1px solid rgba(0,243,255,0.3)',
+          borderRadius: '14px', padding: '0.85rem 1.2rem',
+          display: 'flex', alignItems: 'center', gap: '0.9rem',
+          boxShadow: '0 0 24px rgba(0,243,255,0.15)', zIndex: 9999,
+          maxWidth: '90vw', backdropFilter: 'blur(12px)'
+        }}>
+          <img src="/favicon.png" alt="" style={{ width: 36, height: 36, borderRadius: 8 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>Instalar Urbanova Radio</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Acceso rápido desde tu pantalla de inicio</div>
+          </div>
+          <button onClick={handleInstall} style={{
+            background: 'var(--neon-cyan)', color: '#000', border: 'none',
+            borderRadius: 8, padding: '0.45rem 0.9rem', fontWeight: 700,
+            fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap'
+          }}>Instalar</button>
+          <button onClick={() => setShowInstallBanner(false)} style={{
+            background: 'transparent', border: 'none', color: 'var(--text-muted)',
+            cursor: 'pointer', fontSize: '1.1rem', padding: '0.2rem'
+          }}>✕</button>
+        </div>
+      )}
+
+      {/* Banner instalación iOS */}
+      {showIosBanner && (
+        <div style={{
+          position: 'fixed', bottom: '1.2rem', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(10,10,15,0.97)', border: '1px solid rgba(0,243,255,0.3)',
+          borderRadius: '14px', padding: '0.85rem 1.2rem',
+          display: 'flex', alignItems: 'center', gap: '0.9rem',
+          boxShadow: '0 0 24px rgba(0,243,255,0.15)', zIndex: 9999,
+          maxWidth: '90vw', backdropFilter: 'blur(12px)'
+        }}>
+          <img src="/favicon.png" alt="" style={{ width: 36, height: 36, borderRadius: 8 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>Instalar en iPhone</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Pulsa <span style={{ color: 'var(--neon-cyan)' }}>⬆ Compartir</span> → "Añadir a pantalla de inicio"
+            </div>
+          </div>
+          <button onClick={() => setShowIosBanner(false)} style={{
+            background: 'transparent', border: 'none', color: 'var(--text-muted)',
+            cursor: 'pointer', fontSize: '1.1rem', padding: '0.2rem'
+          }}>✕</button>
+        </div>
+      )}
+
     </div>
   );
 }
