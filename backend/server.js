@@ -530,9 +530,8 @@ async function handleBroadcast(req, res) {
     const encoderName = (currentDj ? currentDj.display_name : null) || req.headers['ice-name'] || "DJ Residente";
     console.log(`🎙️ === DJ CONECTADO: ${encoderName} (${req.method} HTTP/${req.httpVersion}) === 🎙️`);
 
-    // Detener AutoDJ
-    stopAutoDj();
-
+    // NO paramos el AutoDJ todavía — seguirá sonando hasta que llegue el primer chunk del DJ
+    // Esto evita el gap de silencio entre autenticación y primer audio del DJ
     radioState.isDjLive = true;
     radioState.djName = encoderName;
     radioState.currentSong = "¡Transmisión en Vivo!";
@@ -559,9 +558,7 @@ async function handleBroadcast(req, res) {
     res.end = () => {};
 
     let isDisconnected = false;
-
-    // Marcar cuándo llega el primer dato del DJ
-    lastDjDataAt = Date.now();
+    let djStarted = false; // true tras recibir el primer chunk del DJ
 
     const endConnection = () => {
         if (isDisconnected) return;
@@ -579,7 +576,13 @@ async function handleBroadcast(req, res) {
 
     // Ahora el socket es nuestro — recibimos el stream de audio directamente
     socket.on('data', (chunk) => {
-        lastDjDataAt = Date.now(); // actualizar timestamp con cada chunk recibido
+        if (!djStarted) {
+            // Primer chunk del DJ: ahora sí paramos el AutoDJ (transición sin gap)
+            djStarted = true;
+            stopAutoDj();
+            console.log(`🎙️ DJ ${encoderName}: primer chunk recibido, AutoDJ detenido.`);
+        }
+        lastDjDataAt = Date.now();
         activeListeners.forEach(clientRes => {
             try { clientRes.write(chunk); } catch(e) {}
         });
