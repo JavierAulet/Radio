@@ -51,11 +51,27 @@ const chatHistory = [
 const activeListeners = new Set();
 let currentListeners = 0;
 
-// Estado Global de la Radio
 let radioState = {
   isDjLive: false,
   djName: null,
   currentSong: "Cargando AutoDJ..."
+};
+
+const MAX_HISTORY = 5;
+let songHistory = [];
+
+const cleanSongName = (filename) => {
+    if (!filename) return "Desconocido";
+    let name = filename.replace(/\.(mp3|wav|flac|ogg)$/i, ''); // quitar extensión
+    name = name.replace(/^(\d+\s*-\s*\d+[A-Z]\s*-\s*|\d+[A-Z]\s*-\s*|\d+\s*BPM\s*-\s*)/i, ''); // quitar "11A - " o "113 - 11A - "
+    name = name.replace(/\s*\(?\d+\s*BPM\)?\s*$/i, ''); // quitar " (113 BPM)" al final
+    return name.trim();
+};
+
+const addToHistory = (song) => {
+    if (songHistory.length > 0 && songHistory[0] === song) return;
+    songHistory.unshift(song);
+    if (songHistory.length > MAX_HISTORY) songHistory.pop();
 };
 
 // AUTO-DJ SYSTEM
@@ -268,8 +284,11 @@ const playNextAutoDjTrack = () => {
         autoDjTrackStart = Date.now();
         currentTrackName = nextFile;
         playedSongs.add(nextFile);
-        radioState.currentSong = nextFile.replace('.mp3', '');
-        io.emit('radioData', radioState);
+        
+        const cleanName = cleanSongName(nextFile);
+        radioState.currentSong = cleanName;
+        addToHistory(cleanName);
+        io.emit('radioData', { ...radioState, history: songHistory });
     } catch(e) {
         console.error('AutoDJ: Error abriendo track:', e.message);
         setTimeout(playNextAutoDjTrack, 500);
@@ -309,8 +328,11 @@ const playNextAutoDjTrack = () => {
                 autoDjTrackStart = Date.now();
                 currentTrackName = nextFile;
                 playedSongs.add(nextFile);
-                radioState.currentSong = nextFile.replace('.mp3', '');
-                io.emit('radioData', radioState);
+                
+                const cleanName = cleanSongName(nextFile);
+                radioState.currentSong = cleanName;
+                addToHistory(cleanName);
+                io.emit('radioData', { ...radioState, history: songHistory });
             } catch(e) {
                 console.error('AutoDJ: Error cambiando pista:', e.message);
                 return;
@@ -353,7 +375,7 @@ app.get('/stream', (req, res) => {
       'Connection': 'keep-alive',
       'Cache-Control': 'no-cache, no-store',
       'Access-Control-Allow-Origin': '*',
-      'icy-name': 'Premium Online Radio',
+      'icy-name': 'Urbanova Radio',
       'icy-description': 'Transmisión en vivo ininterrumpida',
       'icy-pub': '1',
       'icy-br': '128'
@@ -434,7 +456,8 @@ async function handleBroadcast(req, res) {
     radioState.isDjLive = true;
     radioState.djName = encoderName;
     radioState.currentSong = "¡Transmisión en Vivo!";
-    io.emit('radioData', radioState);
+    addToHistory(`🎙️ DJ Show: ${encoderName}`);
+    io.emit('radioData', { ...radioState, history: songHistory });
     io.emit('systemMessage', { text: `🎙️ ¡Un DJ se ha conectado (${encoderName}) y estamos EN VIVO!`, isError: false });
 
     const socket = req.socket;
@@ -656,7 +679,7 @@ io.on('connection', (socket) => {
       const requests = await getSongRequests();
       socket.emit('initialSongRequests', requests);
       socket.emit('listenersCount', currentListeners);
-      socket.emit('radioData', radioState); // Enviar estado del DJ/AutoDJ
+      socket.emit('radioData', { ...radioState, history: songHistory }); // Enviar estado del DJ/AutoDJ con historial
     } catch (e) {
       console.error('Error in join event:', e);
     }
@@ -718,7 +741,8 @@ io.on('connection', (socket) => {
       }
       if (allowed && radioState.isDjLive) {
           radioState.currentSong = songName;
-          io.emit('radioData', radioState);
+          addToHistory(songName);
+          io.emit('radioData', { ...radioState, history: songHistory });
           io.emit('systemMessage', { text: `🎵 Sonando ahora: ${songName}`, isError: false });
       }
   });

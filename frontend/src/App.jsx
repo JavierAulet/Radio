@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Play, Pause, Volume2, VolumeX, MessageSquare, Music, Send, Share2, Plus, Settings, Radio, Users } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, MessageSquare, Music, Send, Share2, Plus, Settings, Radio, Users, Clock, Bell } from 'lucide-react';
 import { io } from 'socket.io-client';
 import DjDashboard from './DjDashboard';
 import AdminDashboard from './AdminDashboard';
@@ -24,8 +24,29 @@ function RadioPlayer() {
   const [userLevel, setUserLevel]   = useState(1);
   const [userXp, setUserXp]         = useState(0);
   const [listenerCount, setListenerCount] = useState(0);
-  const [activeTab, setActiveTab]   = useState('chat'); // 'chat' | 'requests'
+  const [activeTab, setActiveTab]   = useState('chat'); // 'chat' | 'requests' | 'history'
   const [needsClick, setNeedsClick] = useState(false);
+  const [toasts, setToasts]         = useState([]);
+
+  // Unique color per username from a curated palette
+  const USER_COLORS = [
+    '#ff6b6b', '#ffa502', '#2ed573', '#1e90ff', '#ff6348',
+    '#7bed9f', '#70a1ff', '#ff4757', '#eccc68', '#a29bfe',
+    '#fd79a8', '#00cec9', '#e17055', '#6c5ce7', '#55efc4',
+    '#fdcb6e', '#e84393', '#00b894', '#0984e3', '#d63031'
+  ];
+  const getUserColor = (name) => {
+    if (!name || name === 'Sistema') return 'var(--text-muted)';
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return USER_COLORS[Math.abs(hash) % USER_COLORS.length];
+  };
+
+  const addToast = (text, type = 'info') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev.slice(-3), { id, text, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4500);
+  };
 
   const audioRef       = useRef(null);
   const canvasRef      = useRef(null);
@@ -107,13 +128,22 @@ function RadioPlayer() {
     socket.on('userData',           d  => { setUserLevel(d.level); setUserXp(d.xp); });
     socket.on('chatHistory',        h  => setChatMessages(h));
     socket.on('newMessage',         m  => setChatMessages(p => [...p, m]));
-    socket.on('systemMessage',      m  => setChatMessages(p => [...p, {
-      id: Date.now(), user: 'Sistema', text: m.text,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), level: 99
-    }]));
+    socket.on('systemMessage',      m  => {
+      setChatMessages(p => [...p, {
+        id: Date.now(), user: 'Sistema', text: m.text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), level: 99
+      }]);
+      addToast(m.text, m.isError ? 'error' : 'info');
+    });
     socket.on('initialSongRequests', r => setSongRequests(r));
     socket.on('updateSongRequests',  r => setSongRequests(r));
-    socket.on('radioData',           d => setRadioInfo(d));
+    socket.on('radioData',           d => {
+      const prev = radioInfo.currentSong;
+      setRadioInfo(d);
+      if (d.currentSong && d.currentSong !== prev && d.currentSong !== 'Conectando...') {
+        addToast(`🎵 ${d.currentSong}`, 'song');
+      }
+    });
     socket.on('listenersCount',      n => setListenerCount(n));
 
     fetch('http://localhost:8000/api/schedules')
@@ -250,6 +280,16 @@ function RadioPlayer() {
           </p>
         </div>
       )}
+
+      {/* ── TOASTS ── */}
+      <div className="toast-container">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast toast-${t.type}`}>
+            <Bell size={13} style={{ flexShrink: 0 }} />
+            <span>{t.text}</span>
+          </div>
+        ))}
+      </div>
 
       {/* ── MAIN AREA ── */}
       <main className="main-content glass-panel">
@@ -420,6 +460,7 @@ function RadioPlayer() {
         }}>
           {[
             { key: 'chat', label: 'Chat', icon: <MessageSquare size={14}/> },
+            { key: 'history', label: 'Historial', icon: <Clock size={14}/> },
             { key: 'requests', label: 'Peticiones', icon: <Music size={14}/> },
           ].map(t => (
             <button
@@ -452,21 +493,15 @@ function RadioPlayer() {
                   <div className="avatar" style={{
                     background: msg.user === 'Sistema'
                       ? 'rgba(100,100,120,0.5)'
-                      : msg.user === username
-                        ? 'linear-gradient(135deg, var(--neon-magenta), #8800cc)'
-                        : 'linear-gradient(135deg, var(--neon-cyan), #0055ff)',
-                    color: msg.user === 'Sistema' ? 'var(--text-muted)' : 'var(--bg-dark)'
+                      : `linear-gradient(135deg, ${getUserColor(msg.user)}, ${getUserColor(msg.user)}88)`,
+                    color: msg.user === 'Sistema' ? 'var(--text-muted)' : '#fff'
                   }}>
                     {msg.user.charAt(0).toUpperCase()}
                   </div>
                   <div className="msg-content">
                     <div className="msg-header">
                       <span className="msg-username" style={{
-                        color: msg.user === 'Sistema'
-                          ? 'var(--text-muted)'
-                          : msg.user === username
-                            ? 'var(--neon-magenta)'
-                            : 'var(--neon-cyan)'
+                        color: msg.user === 'Sistema' ? 'var(--text-muted)' : getUserColor(msg.user)
                       }}>
                         {msg.user}
                         {msg.level && msg.user !== 'Sistema' && (
@@ -495,6 +530,50 @@ function RadioPlayer() {
               />
               <button type="submit" className="btn-send"><Send size={14} /></button>
             </form>
+          </div>
+        )}
+
+        {/* HISTORY */}
+        {activeTab === 'history' && (
+          <div className="chat-panel glass-panel" style={{ flex: 1 }}>
+            <div className="panel-header">
+              <Clock size={14} /> Historial
+            </div>
+            <div className="panel-content">
+              {(radioInfo.history && radioInfo.history.length > 0) ? (
+                radioInfo.history.map((song, i) => (
+                  <div key={i} className="history-item" style={{
+                    display: 'flex', alignItems: 'center', gap: '0.75rem',
+                    padding: '0.7rem 0.85rem', borderRadius: '10px',
+                    background: i === 0 ? 'rgba(0, 243, 255, 0.06)' : 'rgba(255,255,255,0.02)',
+                    border: i === 0 ? '1px solid rgba(0, 243, 255, 0.15)' : '1px solid rgba(255,255,255,0.03)',
+                    marginBottom: '0.35rem', transition: 'all 0.2s'
+                  }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '8px', flexShrink: 0,
+                      background: i === 0 ? 'linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta))' : 'rgba(255,255,255,0.06)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.7rem', fontWeight: 700, color: i === 0 ? '#fff' : 'var(--text-subtle)',
+                      fontFamily: 'var(--font-mono)'
+                    }}>
+                      {i === 0 ? '▶' : i}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '0.82rem', fontWeight: i === 0 ? 600 : 400,
+                        color: i === 0 ? 'var(--text-main)' : 'var(--text-muted)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>{song}</div>
+                      {i === 0 && <div style={{ fontSize: '0.65rem', color: 'var(--neon-cyan)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem' }}>SONANDO AHORA</div>}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ textAlign: 'center', color: 'var(--text-subtle)', fontSize: '0.82rem', padding: '2rem 0' }}>
+                  El historial aparecerá aquí cuando suenen canciones.
+                </div>
+              )}
+            </div>
           </div>
         )}
 
