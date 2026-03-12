@@ -540,20 +540,52 @@ body {
 .text-gradient { background: linear-gradient(135deg,#e0e0f0 0%,var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 700; }
 @keyframes fadeInUp { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 
-/* ─── MOBILE ─── */
+/* ─── TABLET ─── */
 @media (max-width: 900px) {
   .content-grid { grid-template-columns: 1fr; padding: 0 1rem 1.5rem; }
   .stats-row { grid-template-columns: repeat(3,1fr); padding: 1rem; gap: 0.75rem; }
+  .hero-sub { letter-spacing: 0.25em; }
+  .hero-song-text { max-width: 240px; }
 }
+
+/* ─── MOBILE ─── */
 @media (max-width: 600px) {
-  .sticky-player { padding: 0.5rem 1rem; gap: 0.6rem; }
-  .sp-song { max-width: 150px; font-size: 0.78rem; }
-  .sp-volume { width: 55px; }
-  .hero-section { min-height: 80vh; }
-  .hero-content { gap: 0.75rem; }
-  .stats-row { grid-template-columns: 1fr; }
-  .stat-card { flex-direction: row; text-align: left; padding: 1rem; }
+  /* Player */
+  .sticky-player { padding: 0.5rem 0.75rem; gap: 0.5rem; }
+  .sp-song { max-width: 130px; font-size: 0.78rem; }
+  .sp-volume { display: none; }
+  .sp-listeners { display: none; }
+  .sp-logo { width: 26px; height: 26px; }
+
+  /* Hero */
+  .hero-section { min-height: 75vh; }
+  .hero-content { gap: 0.6rem; padding: 1.5rem 1rem; }
+  .hero-sub { letter-spacing: 0.15em; font-size: 0.75rem; }
+  .hero-tagline { font-size: 0.82rem; padding: 0 0.5rem; }
+  .hero-song-text { max-width: calc(100vw - 140px); }
+  .hero-now-playing { padding: 0.4rem 0.9rem; font-size: 0.78rem; }
+  .hero-waves { height: 120px; gap: 2px; padding: 0 0.5rem; }
+
+  /* Stats */
+  .stats-row { grid-template-columns: 1fr; padding: 0.75rem; gap: 0.6rem; }
+  .stat-card { flex-direction: row; text-align: left; padding: 0.9rem 1rem; gap: 0.8rem; }
+
+  /* Content */
+  .content-grid { padding: 0 0.75rem 1.5rem; gap: 0.75rem; }
+  .content-card { padding: 1rem; }
+
+  /* Toast */
   .toast-container { left: 0.75rem; right: 0.75rem; max-width: none; top: 4rem; }
-  .dashboard-container { padding: 1rem; }
+
+  /* Dashboards */
+  .dashboard-container { padding: 0.75rem; }
   .dashboard-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── SMALL PHONES ─── */
+@media (max-width: 380px) {
+  .sp-song { max-width: 100px; }
+  .hero-title { font-size: clamp(2.4rem, 12vw, 3.5rem); }
+  .stats-row { padding: 0.5rem; }
+  .content-grid { padding: 0 0.5rem 1rem; }
 }
