@@ -178,14 +178,20 @@ socket.on('radioData',           d => {
     if (!isPlaying || !canvasRef.current) return;
 
     if (!audioCtxRef.current) {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      const src = ctx.createMediaElementSource(audioRef.current);
-      src.connect(analyser);
-      analyser.connect(ctx.destination);
-      audioCtxRef.current = ctx;
-      analyserRef.current = analyser;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        const src = ctx.createMediaElementSource(audioRef.current);
+        src.connect(analyser);
+        analyser.connect(ctx.destination);
+        audioCtxRef.current = ctx;
+        analyserRef.current = analyser;
+      } catch(e) {
+        // createMediaElementSource falla sin crossOrigin en algunos navegadores;
+        // el audio sigue funcionando, solo sin visualizador
+        return;
+      }
     } else if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume();
     }
@@ -259,7 +265,7 @@ socket.on('radioData',           d => {
 
   return (
     <div className="app-container">
-      <audio ref={audioRef} crossOrigin="anonymous" preload="none" />
+      <audio ref={audioRef} preload="none" />
 
       {/* Overlay "click para escuchar" cuando el navegador bloquea autoplay */}
       {needsClick && (
