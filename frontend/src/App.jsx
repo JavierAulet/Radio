@@ -109,15 +109,17 @@ const [radioInfo, setRadioInfo]   = useState({ isDjLive: false, djName: null, cu
     };
   }, []);
 
-  // El click no reasigna src (ya está cargando), solo reanuda con gesto de usuario
+  // Siempre conexión fresca al hacer click — la conexión del intento de autoplay
+  // puede quedar stalled/errored en Chrome y Firefox, lo que hace que play() falle
+  // silenciosamente. Una nueva URL fuerza una petición limpia al servidor.
   const startFromClick = () => {
-    if (!audioRef.current) return;
-    if (!audioRef.current.src || audioRef.current.networkState === 0) {
-      audioRef.current.src = `${STREAM_URL}?t=${Date.now()}`;
-    }
-    audioRef.current.play()
-      .then(() => { setIsPlaying(true); setNeedsClick(false); })
-      .catch(() => {});
+    const audio = audioRef.current;
+    if (!audio) return;
+    setNeedsClick(false); // ocultar overlay inmediatamente = feedback instantáneo
+    audio.src = `${STREAM_URL}?t=${Date.now()}`;
+    audio.play()
+      .then(() => { setIsPlaying(true); })
+      .catch(() => { setNeedsClick(true); }); // si falla, mostrar overlay de nuevo
   };
 
   // Socket setup
