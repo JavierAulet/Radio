@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Music, UserPlus, Trash2, UploadCloud, Users, Server, Radio, ArrowLeft, Search, SkipForward, Headphones, Key, User, Megaphone } from 'lucide-react';
 
+const BACKEND = `${window.location.protocol}//${window.location.hostname}:8000`;
+
 export default function AdminDashboard({ socket }) {
   const [adminUser, setAdminUser] = useState('');
   const [adminPass, setAdminPass] = useState('');
@@ -45,7 +47,7 @@ export default function AdminDashboard({ socket }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8000/api/admin/djs', { headers: authHeaders() });
+      const res = await fetch(`${BACKEND}/api/admin/djs`, { headers: authHeaders() });
       if (res.ok) {
         setIsAuthenticated(true);
         setDjs(await res.json());
@@ -63,14 +65,14 @@ export default function AdminDashboard({ socket }) {
 
   const loadDjs = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/djs', { headers: authHeaders() });
+      const res = await fetch(`${BACKEND}/api/admin/djs`, { headers: authHeaders() });
       setDjs(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const loadMusic = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/music', { headers: authHeaders() });
+      const res = await fetch(`${BACKEND}/api/admin/music`, { headers: authHeaders() });
       setSongs(await res.json());
     } catch (err) { console.error(err); }
   };
@@ -78,7 +80,7 @@ export default function AdminDashboard({ socket }) {
   const handleCreateDj = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8000/api/admin/djs', {
+      const res = await fetch(`${BACKEND}/api/admin/djs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ username: newDjUser, password: newDjPass, display_name: newDjName })
@@ -95,7 +97,7 @@ export default function AdminDashboard({ socket }) {
   const handleDeleteDj = async (id) => {
     if (!window.confirm("¿Eliminar este locutor y sus turnos programados?")) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/djs/${id}`, {
+      const res = await fetch(`${BACKEND}/api/admin/djs/${id}`, {
         method: 'DELETE', headers: authHeaders()
       });
       if (res.ok) loadDjs();
@@ -110,7 +112,7 @@ export default function AdminDashboard({ socket }) {
       const formData = new FormData();
       formData.append('song', file);
       try {
-        await fetch('http://localhost:8000/api/admin/music', {
+        await fetch(`${BACKEND}/api/admin/music`, {
           method: 'POST', headers: authHeaders(), body: formData
         });
       } catch (e) { console.error('Upload error:', e); }
@@ -137,7 +139,7 @@ export default function AdminDashboard({ socket }) {
   const handleDeleteMusic = async (filename) => {
     if (!window.confirm(`¿Eliminar ${filename} del AutoDJ?`)) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/music/${encodeURIComponent(filename)}`, {
+      const res = await fetch(`${BACKEND}/api/admin/music/${encodeURIComponent(filename)}`, {
         method: 'DELETE', headers: authHeaders()
       });
       if (res.ok) loadMusic();
@@ -146,7 +148,7 @@ export default function AdminDashboard({ socket }) {
 
   const handleSkip = async () => {
     try {
-      await fetch('http://localhost:8000/api/admin/skip', {
+      await fetch(`${BACKEND}/api/admin/skip`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }
       });
     } catch (e) { alert("Error de red"); }
@@ -154,7 +156,7 @@ export default function AdminDashboard({ socket }) {
 
   const loadAdsList = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/ads', { headers: authHeaders() });
+      const res = await fetch(`${BACKEND}/api/admin/ads`, { headers: authHeaders() });
       const data = await res.json();
       setAds(data.ads || []);
       setAdInterval(data.interval);
@@ -169,7 +171,7 @@ export default function AdminDashboard({ socket }) {
       const formData = new FormData();
       formData.append('ad', file);
       try {
-        await fetch('http://localhost:8000/api/admin/ads/upload', {
+        await fetch(`${BACKEND}/api/admin/ads/upload`, {
           method: 'POST', headers: authHeaders(), body: formData
         });
       } catch (e) { console.error('Ad upload error:', e); }
@@ -188,7 +190,7 @@ export default function AdminDashboard({ socket }) {
   const handleDeleteAd = async (filename) => {
     if (!window.confirm(`¿Eliminar cuña "${filename}"?`)) return;
     try {
-      await fetch(`http://localhost:8000/api/admin/ads/${encodeURIComponent(filename)}`, {
+      await fetch(`${BACKEND}/api/admin/ads/${encodeURIComponent(filename)}`, {
         method: 'DELETE', headers: authHeaders()
       });
       loadAdsList();
@@ -200,7 +202,7 @@ export default function AdminDashboard({ socket }) {
     const val = parseInt(adIntervalInput, 10);
     if (isNaN(val) || val < 0) return;
     try {
-      const res = await fetch('http://localhost:8000/api/admin/ads/config', {
+      const res = await fetch(`${BACKEND}/api/admin/ads/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ interval: val })

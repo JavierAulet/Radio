@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Radio, Key, HardDrive, Music, CheckCircle, AlertTriangle, Calendar, Clock, User, ArrowLeft, Users, Copy, Check, Headphones, Trash2 } from 'lucide-react';
 
+const BACKEND = `${window.location.protocol}//${window.location.hostname}:8000`;
+
 export default function DjDashboard({ socket }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +40,7 @@ export default function DjDashboard({ socket }) {
 
   const loadSchedules = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/schedules');
+      const res = await fetch(`${BACKEND}/api/schedules`);
       const data = await res.json();
       setSchedules(data);
     } catch (e) { console.error("Error loading schedules"); }
@@ -47,7 +49,7 @@ export default function DjDashboard({ socket }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8000/api/dj/login', {
+      const res = await fetch(`${BACKEND}/api/dj/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -71,7 +73,7 @@ export default function DjDashboard({ socket }) {
   const handleBookSlot = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8000/api/schedules', {
+      const res = await fetch(`${BACKEND}/api/schedules`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, day_of_week: dayOfWeek, start_time: startTime, end_time: endTime, show_name: showName })
@@ -90,7 +92,7 @@ export default function DjDashboard({ socket }) {
   const handleDeleteSchedule = async (id) => {
     if (!window.confirm('¿Eliminar este turno?')) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/schedules/${id}`, {
+      const res = await fetch(`${BACKEND}/api/schedules/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })

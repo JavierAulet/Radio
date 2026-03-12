@@ -5,8 +5,11 @@ import { io } from 'socket.io-client';
 import DjDashboard from './DjDashboard';
 import AdminDashboard from './AdminDashboard';
 
-const socket = io('http://localhost:8000');
-const STREAM_URL = "http://localhost:8000/stream";
+// Detecta el host dinámicamente para que funcione tanto en localhost
+// como cuando otros usuarios acceden desde una IP o dominio diferente
+const BACKEND = `${window.location.protocol}//${window.location.hostname}:8000`;
+const socket = io(BACKEND);
+const STREAM_URL = `${BACKEND}/stream`;
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -158,7 +161,7 @@ socket.on('radioData',           d => {
     });
     socket.on('listenersCount',      n => setListenerCount(n));
 
-    fetch('http://localhost:8000/api/schedules')
+    fetch(`${BACKEND}/api/schedules`)
       .then(r => r.json()).then(setSchedules).catch(() => {});
 
     return () => {
