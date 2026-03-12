@@ -5,7 +5,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 
-const { getUser, createUser, addXP, authenticateDj, getSchedules, addSchedule, deleteSchedule, getScheduleById, getAllDjs, createDj, deleteDj } = require('./database');
+const { getUser, createUser, addXP, authenticateDj, getSchedules, addSchedule, deleteSchedule, getScheduleById, getAllDjs, createDj, deleteDj, logPlay, getTopSongs, getTopArtists } = require('./database');
 
 const app = express();
 app.use(cors());
@@ -312,6 +312,7 @@ const playNextAutoDjTrack = () => {
         const cleanName = cleanSongName(nextFile);
         radioState.currentSong = cleanName;
         addToHistory(cleanName);
+        logPlay(nextFile);
         io.emit('radioData', { ...radioState, history: songHistory });
     } catch(e) {
         console.error('AutoDJ: Error abriendo track:', e.message);
@@ -385,6 +386,7 @@ const playNextAutoDjTrack = () => {
                     const cleanName  = cleanSongName(nextFile);
                     radioState.currentSong = cleanName;
                     addToHistory(cleanName);
+                    logPlay(nextFile);
                     io.emit('radioData', { ...radioState, history: songHistory });
                 } catch(e) {
                     console.error('AutoDJ: Error cambiando pista:', e.message);
@@ -662,6 +664,14 @@ app.get('/api/radio/status', (req, res) => {
         listeners: currentListeners,
         totalSongs
     });
+});
+
+app.get('/api/top-songs', async (_req, res) => {
+    try { res.json(await getTopSongs(10)); } catch(e) { res.json([]); }
+});
+
+app.get('/api/top-artists', async (_req, res) => {
+    try { res.json(await getTopArtists(10)); } catch(e) { res.json([]); }
 });
 
 // --- ADMIN API ENDPOINTS ---

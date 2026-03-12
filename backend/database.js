@@ -34,6 +34,13 @@ db.run(`CREATE TABLE IF NOT EXISTS djs (
           }
       });
 
+      db.run(`CREATE TABLE IF NOT EXISTS play_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        song_name TEXT NOT NULL,
+        artist_name TEXT,
+        played_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
       db.run(`CREATE TABLE IF NOT EXISTS schedules (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         dj_id INTEGER,
@@ -174,6 +181,53 @@ const deleteDj = (id) => {
     });
 };
 
+const parseArtist = (filename) => {
+  const name = filename.replace(/\.mp3$/i, '');
+  const parts = name.split(' - ');
+  if (parts.length >= 3 && /^\d+$/.test(parts[0].trim()) && /^\d+[A-Za-z]+$/.test(parts[1].trim())) {
+    return parts[2].trim();
+  }
+  if (parts.length >= 2) return parts[0].trim();
+  return null;
+};
+
+const logPlay = (songName) => {
+  const artist = parseArtist(songName);
+  db.run('INSERT INTO play_history (song_name, artist_name) VALUES (?, ?)', [songName, artist]);
+};
+
+const getTopSongs = (limit = 10) => {
+  return new Promise((resolve, reject) => {
+    db.all(`
+      SELECT song_name, artist_name, COUNT(*) as plays
+      FROM play_history
+      WHERE played_at > datetime('now', '-7 days')
+      GROUP BY song_name
+      ORDER BY plays DESC
+      LIMIT ?
+    `, [limit], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
+const getTopArtists = (limit = 10) => {
+  return new Promise((resolve, reject) => {
+    db.all(`
+      SELECT artist_name, COUNT(*) as plays
+      FROM play_history
+      WHERE played_at > datetime('now', '-7 days') AND artist_name IS NOT NULL AND artist_name != ''
+      GROUP BY artist_name
+      ORDER BY plays DESC
+      LIMIT ?
+    `, [limit], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+};
+
 module.exports = {
   db,
   getUser,
@@ -186,5 +240,8 @@ module.exports = {
   getScheduleById,
   getAllDjs,
   createDj,
-  deleteDj
+  deleteDj,
+  logPlay,
+  getTopSongs,
+  getTopArtists
 };
