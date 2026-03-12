@@ -217,27 +217,42 @@ function RadioPlayer() {
     const analyser = analyserRef.current;
     const bufLen = analyser.frequencyBinCount;
     const data = new Uint8Array(bufLen);
+
+    // Adaptar el buffer del canvas al tamaño real en pantalla
+    const syncSize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width  = rect.width  * dpr;
+      canvas.height = rect.height * dpr;
+      ctx2d.scale(dpr, dpr);
+    };
+    syncSize();
+    const ro = new ResizeObserver(syncSize);
+    ro.observe(canvas);
+
     let raf;
     const draw = () => {
       raf = requestAnimationFrame(draw);
       analyser.getByteFrequencyData(data);
-      ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-      const barW = (canvas.width / bufLen) * 2.2;
+      const w = canvas.getBoundingClientRect().width;
+      const h = canvas.getBoundingClientRect().height;
+      ctx2d.clearRect(0, 0, w, h);
+      const barW = (w / bufLen) * 2.2;
       let x = 0;
       for (let i = 0; i < bufLen; i++) {
-        const h = data[i] * 0.55;
-        const g = ctx2d.createLinearGradient(0, canvas.height - h, 0, canvas.height);
+        const barH = data[i] * (h / 255) * 0.85;
+        const g = ctx2d.createLinearGradient(0, h - barH, 0, h);
         g.addColorStop(0, `rgba(0,243,255,${data[i]/255})`);
         g.addColorStop(1, 'rgba(255,0,229,0.6)');
         ctx2d.fillStyle = g;
         ctx2d.beginPath();
-        ctx2d.roundRect(x, canvas.height - h, barW, h, Math.min(barW/2, 3));
+        ctx2d.roundRect(x, h - barH, barW, barH, Math.min(barW/2, 3));
         ctx2d.fill();
         x += barW + 2;
       }
     };
     draw();
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [isPlaying]);
 
   // PWA install
@@ -361,7 +376,7 @@ function RadioPlayer() {
       <section className="hero-section">
         <div className="hero-bg" />
         <HeroWaves isPlaying={isPlaying} />
-        <canvas ref={canvasRef} width={1200} height={160} className="hero-canvas" />
+        <canvas ref={canvasRef} className="hero-canvas" />
         <div className="hero-content">
           <div className="hero-live-badge">
             <span className="live-dot" />
