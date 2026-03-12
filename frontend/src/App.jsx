@@ -160,7 +160,7 @@ socket.on('radioData',           d => {
     });
     socket.on('listenersCount',      n => setListenerCount(n));
 
-    fetch(`${BACKEND}/api/schedules`)
+    fetch('/api/schedules')
       .then(r => r.json()).then(setSchedules).catch(() => {});
 
     return () => {
