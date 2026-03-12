@@ -570,14 +570,14 @@ body {
   .sp-listeners { display: none; }
   .sp-logo { width: 26px; height: 26px; }
 
-  /* Hero */
-  .hero-section { min-height: 75vh; }
-  .hero-content { gap: 0.6rem; padding: 1.5rem 1rem; }
+  /* Hero — más compacto para que los rankings no queden aplastados */
+  .hero-section { min-height: 55vh; }
+  .hero-content { gap: 0.5rem; padding: 1.2rem 1rem 0; }
   .hero-sub { letter-spacing: 0.15em; font-size: 0.75rem; }
   .hero-tagline { font-size: 0.82rem; padding: 0 0.5rem; }
   .hero-song-text { max-width: calc(100vw - 140px); }
   .hero-now-playing { padding: 0.4rem 0.9rem; font-size: 0.78rem; }
-  .hero-waves { height: 120px; gap: 2px; padding: 0 0.5rem; }
+  .hero-waves { height: 90px; gap: 2px; padding: 0 0.5rem; }
 
   /* Stats */
   .stats-row { grid-template-columns: 1fr; padding: 0.75rem; gap: 0.6rem; }
