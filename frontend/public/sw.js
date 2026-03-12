@@ -16,12 +16,14 @@ self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// Activación: eliminar TODAS las caches anteriores y tomar control
+// Activación: limpiar caches viejas, tomar control y recargar todos los clientes
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then(clients => clients.forEach(c => c.navigate(c.url)))
   );
 });
 
