@@ -313,7 +313,9 @@ const playNextAutoDjTrack = () => {
         radioState.currentSong = cleanName;
         addToHistory(cleanName);
         logPlay(nextFile);
-        io.emit('radioData', { ...radioState, history: songHistory });
+        // Retrasar el emit para sincronizar con el buffer del navegador (~5s)
+        const snap1 = { ...radioState, history: [...songHistory] };
+        setTimeout(() => io.emit('radioData', snap1), 5000);
     } catch(e) {
         console.error('AutoDJ: Error abriendo track:', e.message);
         setTimeout(playNextAutoDjTrack, 500);
@@ -354,7 +356,8 @@ const playNextAutoDjTrack = () => {
                     isPlayingAd      = true;
                     songsSinceLastAd = 0;
                     radioState.currentSong = '📢 Publicidad';
-                    io.emit('radioData', { ...radioState, history: songHistory });
+                    const snapAd = { ...radioState, history: [...songHistory] };
+                    setTimeout(() => io.emit('radioData', snapAd), 5000);
                 } catch(e) {
                     console.error('AutoDJ: Error abriendo cuña:', e.message);
                     isPlayingAd = false;
@@ -387,7 +390,8 @@ const playNextAutoDjTrack = () => {
                     radioState.currentSong = cleanName;
                     addToHistory(cleanName);
                     logPlay(nextFile);
-                    io.emit('radioData', { ...radioState, history: songHistory });
+                    const snap2 = { ...radioState, history: [...songHistory] };
+                    setTimeout(() => io.emit('radioData', snap2), 5000);
                 } catch(e) {
                     console.error('AutoDJ: Error cambiando pista:', e.message);
                     return;
