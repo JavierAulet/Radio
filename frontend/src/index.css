@@ -458,6 +458,11 @@ body {
   box-shadow: var(--shadow-lg); backdrop-filter: blur(12px);
   animation: toast-in 0.35s ease-out, toast-out 0.4s ease-in 4s forwards;
   pointer-events: auto; line-height: 1.35;
+  max-width: 100%; overflow: hidden;
+}
+.toast span, .toast > *:last-child {
+  overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; min-width: 0; flex: 1;
 }
 .toast-info    { border-left: 3px solid var(--accent); }
 .toast-error   { border-left: 3px solid var(--danger); color: #fca5a5; }
@@ -590,6 +595,7 @@ body {
 
   /* Toast */
   .toast-container { left: 0.75rem; right: 0.75rem; max-width: none; top: 4rem; }
+  .toast { font-size: 0.75rem; padding: 0.55rem 0.85rem; }
 
   /* Dashboards */
   .dashboard-container { padding: 0.75rem; }
