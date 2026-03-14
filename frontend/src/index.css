@@ -626,11 +626,43 @@ body {
   filter: invert(1);
 }
 
+/* ─── HERO BOTTOM ROW (now-playing + share) ─── */
+.hero-bottom-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  max-width: 90vw;
+}
+.btn-share-pill {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+  color: var(--text-secondary); cursor: pointer;
+  transition: all 0.2s; backdrop-filter: blur(8px);
+}
+.btn-share-pill:hover {
+  background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.25);
+  color: #fff; transform: scale(1.08);
+}
+
+/* ─── FOOTER ─── */
 .site-footer {
   margin-top: auto; padding: 1.5rem 2rem;
   display: flex; align-items: center; justify-content: center; gap: 1.5rem;
   border-top: 1px solid var(--border);
   flex-wrap: wrap;
+}
+.footer-socials {
+  display: flex; align-items: center; gap: 0.6rem;
+}
+.footer-social-link {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  color: var(--text-muted); text-decoration: none;
+  transition: all 0.2s;
+}
+.footer-social-link:hover {
+  background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2);
+  color: var(--text-primary); transform: translateY(-2px);
 }
 
 /* ─── LIVE BADGE & DOT ─── */
