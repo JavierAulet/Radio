@@ -190,7 +190,40 @@ const detectAudioStart = (fd) => {
     return 0;
 };
 
-// Fisher-Yates shuffle helper
+// ── Metadata cache ──────────────────────────────────────────────────────────
+// Pre-scanned per-file: byteRate + audioStart. Populated at startup so that
+// inline track switches never block the event loop with disk reads.
+const fileMetaCache = new Map(); // filename → { byteRate, audioStart }
+
+const scanFileMeta = (filename, dir) => {
+    try {
+        const fd = fs.openSync(path.join(dir, filename), 'r');
+        const byteRate   = detectMp3ByteRate(fd);
+        const audioStart = detectAudioStart(fd);
+        fs.closeSync(fd);
+        fileMetaCache.set(filename, { byteRate, audioStart });
+    } catch(e) {
+        fileMetaCache.set(filename, { byteRate: 16000, audioStart: 0 });
+    }
+};
+
+const getFileMeta = (filename, dir) => {
+    if (!fileMetaCache.has(filename)) scanFileMeta(filename, dir);
+    return fileMetaCache.get(filename);
+};
+
+// Scan all music files in background (setImmediate chain = non-blocking)
+const preCacheAll = (files, dir) => {
+    let i = 0;
+    const next = () => {
+        if (i >= files.length) return;
+        scanFileMeta(files[i++], dir);
+        setImmediate(next);
+    };
+    setImmediate(next);
+};
+
+// ── Fisher-Yates shuffle helper ──────────────────────────────────────────────
 const shuffle = (arr) => {
     for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -231,6 +264,11 @@ const rebuildQueue = () => {
 // NO interrumpe la canción que está sonando.
 const loadPlaylist = () => {
     rebuildQueue();
+    // Pre-cache metadata for all music files in background
+    if (fs.existsSync(musicDir)) {
+        const allFiles = fs.readdirSync(musicDir).filter(f => f.endsWith('.mp3'));
+        preCacheAll(allFiles, musicDir);
+    }
 };
 
 const stopAutoDj = () => {
@@ -294,10 +332,9 @@ const playNextAutoDjTrack = () => {
 
     try {
         const trackPath = path.join(musicDir, nextFile);
-        const fd = fs.openSync(trackPath, 'r');
+        const { byteRate, audioStart } = getFileMeta(nextFile, musicDir);
+        const fd   = fs.openSync(trackPath, 'r');
         const size = fs.fstatSync(fd).size;
-        const byteRate = detectMp3ByteRate(fd);
-        const audioStart = detectAudioStart(fd);
         console.log(`AutoDJ -> Play: ${nextFile} (${Math.round(byteRate * 8 / 1000)} kbps, audio@${audioStart})`);
 
         autoDjFd         = fd;
@@ -308,14 +345,15 @@ const playNextAutoDjTrack = () => {
         autoDjTrackStart = Date.now();
         currentTrackName = nextFile;
         playedSongs.add(nextFile);
-        
+
         const cleanName = cleanSongName(nextFile);
-        radioState.currentSong = cleanName;
         addToHistory(cleanName);
         logPlay(nextFile);
-        // Retrasar el emit para sincronizar con el buffer del navegador (~5s)
-        const snap1 = { ...radioState, history: [...songHistory] };
-        setTimeout(() => io.emit('radioData', snap1), 5000);
+        // Retrasar la actualización de estado Y el emit para sincronizar con el buffer
+        setTimeout(() => {
+            radioState.currentSong = cleanName;
+            io.emit('radioData', { ...radioState, history: [...songHistory] });
+        }, 5000);
     } catch(e) {
         console.error('AutoDJ: Error abriendo track:', e.message);
         setTimeout(playNextAutoDjTrack, 500);
@@ -373,10 +411,9 @@ const playNextAutoDjTrack = () => {
                 }
                 try {
                     const trackPath  = path.join(musicDir, nextFile);
-                    const fd         = fs.openSync(trackPath, 'r');
-                    const size       = fs.fstatSync(fd).size;
-                    const byteRate   = detectMp3ByteRate(fd);
-                    const audioStart = detectAudioStart(fd);
+                    const { byteRate, audioStart } = getFileMeta(nextFile, musicDir);
+                    const fd   = fs.openSync(trackPath, 'r');
+                    const size = fs.fstatSync(fd).size;
                     console.log(`AutoDJ -> Play: ${nextFile} (${Math.round(byteRate * 8 / 1000)} kbps)`);
                     autoDjFd         = fd;
                     autoDjTrackSize  = size;
@@ -387,11 +424,12 @@ const playNextAutoDjTrack = () => {
                     currentTrackName = nextFile;
                     playedSongs.add(nextFile);
                     const cleanName  = cleanSongName(nextFile);
-                    radioState.currentSong = cleanName;
                     addToHistory(cleanName);
                     logPlay(nextFile);
-                    const snap2 = { ...radioState, history: [...songHistory] };
-                    setTimeout(() => io.emit('radioData', snap2), 5000);
+                    setTimeout(() => {
+                        radioState.currentSong = cleanName;
+                        io.emit('radioData', { ...radioState, history: [...songHistory] });
+                    }, 5000);
                 } catch(e) {
                     console.error('AutoDJ: Error cambiando pista:', e.message);
                     return;
