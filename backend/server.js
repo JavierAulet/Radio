@@ -117,63 +117,77 @@ const loadAds = () => {
     console.log(`Publicidad: ${adPlaylist.length} cuñas cargadas.`);
 };
 
-// Detect MP3 bitrate by scanning frames from the file.
-// For VBR accuracy we use the file size / duration approach when possible,
-// falling back to scanning frames from multiple positions in the file.
+// Detect MP3 byte rate using Xing/Info VBR header (exact average bitrate for VBR)
+// or the first frame's bitrate for CBR files. Reads only 2KB instead of 4×64KB.
+//
+// Root cause of song cuts: the old multi-sample approach limited foundBitrates to 50
+// frames TOTAL across all positions. If all 50 happened to land in lower-bitrate
+// sections of a VBR file, the detected rate was too low → server streamed slower than
+// real-time → client buffer starved → audible cut.
+//
+// Fix: read the Xing/Info header in the first MPEG frame — it stores total_frames and
+// total_bytes so we can compute the exact average bitrate for any VBR file.
 const detectMp3ByteRate = (fd) => {
-    const MPEG1_L3_KBPS = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+    const KBPS = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
     const fileSize = fs.fstatSync(fd).size;
-    const CHUNK = 65536; // 64KB per sample
-    
-    // Detect ID3v2 tag size
-    const id3Buf = Buffer.alloc(10);
-    fs.readSync(fd, id3Buf, 0, 10, 0);
-    let audioOffset = 0;
-    if (id3Buf[0] === 0x49 && id3Buf[1] === 0x44 && id3Buf[2] === 0x33) {
-        audioOffset = 10 + (((id3Buf[6] & 0x7F) << 21) | ((id3Buf[7] & 0x7F) << 14) |
-                            ((id3Buf[8] & 0x7F) << 7)  |  (id3Buf[9] & 0x7F));
+
+    // Skip ID3v2 tag (if present)
+    const hdr = Buffer.alloc(10);
+    fs.readSync(fd, hdr, 0, 10, 0);
+    let audioStart = 0;
+    if (hdr[0] === 0x49 && hdr[1] === 0x44 && hdr[2] === 0x33) {
+        audioStart = 10 + (((hdr[6] & 0x7F) << 21) | ((hdr[7] & 0x7F) << 14) |
+                           ((hdr[8] & 0x7F) <<  7) |  (hdr[9] & 0x7F));
     }
 
-    // Sample frames from multiple positions: start, 25%, 50%, 75% of audio data
-    const audioSize = fileSize - audioOffset;
-    const samplePositions = [
-        audioOffset,
-        audioOffset + Math.floor(audioSize * 0.25),
-        audioOffset + Math.floor(audioSize * 0.50),
-        audioOffset + Math.floor(audioSize * 0.75)
-    ];
+    // Read first 2KB of audio — enough to find the first frame + Xing/Info header
+    const buf = Buffer.alloc(2048);
+    const n = fs.readSync(fd, buf, 0, Math.min(2048, fileSize - audioStart), audioStart);
 
-    const foundBitrates = [];
-    const buf = Buffer.alloc(CHUNK);
+    for (let i = 0; i < n - 4; i++) {
+        if (buf[i] !== 0xFF || (buf[i + 1] & 0xE0) !== 0xE0) continue;
+        const b1 = buf[i + 1], b2 = buf[i + 2], b3 = buf[i + 3];
+        const mpegVer  = (b1 >> 3) & 0x03; // 3=MPEG1, 2=MPEG2, 0=MPEG2.5
+        const layer    = (b1 >> 1) & 0x03; // must be 1 (Layer3)
+        const briIdx   = (b2 >> 4) & 0x0F;
+        const sriIdx   = (b2 >> 2) & 0x03;
+        const padding  = (b2 >> 1) & 0x01;
+        const chanMode = (b3 >> 6) & 0x03; // 3=Mono
+        if (layer !== 1 || briIdx === 0 || briIdx === 15 || sriIdx === 3) continue;
+        const kbps       = KBPS[briIdx];
+        const sampleRate = [44100, 48000, 32000][sriIdx];
+        const frameSize  = Math.floor(144 * kbps * 1000 / sampleRate) + padding;
+        if (frameSize < 24 || frameSize > 1441) continue;
 
-    for (const pos of samplePositions) {
-        if (pos >= fileSize) continue;
-        const n = fs.readSync(fd, buf, 0, CHUNK, pos);
-        for (let i = 0; i < n - 3 && foundBitrates.length < 50; i++) {
-            if (buf[i] !== 0xFF || (buf[i + 1] & 0xE0) !== 0xE0) continue;
-            const b1 = buf[i + 1], b2 = buf[i + 2];
-            const mpeg  = (b1 >> 3) & 0x03;
-            const layer = (b1 >> 1) & 0x03;
-            const bri   = (b2 >> 4) & 0x0F;
-            const sampleRateIdx = (b2 >> 2) & 0x03;
-            const padding = (b2 >> 1) & 0x01;
-            if (mpeg !== 3 || layer !== 1 || bri === 0 || bri === 15 || sampleRateIdx === 3) continue;
-            const kbps = MPEG1_L3_KBPS[bri];
-            const sampleRate = [44100, 48000, 32000][sampleRateIdx];
-            const frameSize = Math.floor(144 * kbps * 1000 / sampleRate) + padding;
-            if (frameSize < 24 || frameSize > 1441) continue;
-            const nextFramePos = i + frameSize;
-            if (nextFramePos + 1 < n && buf[nextFramePos] === 0xFF && (buf[nextFramePos + 1] & 0xE0) === 0xE0) {
-                foundBitrates.push(kbps);
-                i += frameSize - 1;
+        // Side-info size (bytes between 4-byte frame header and Xing/Info tag)
+        // MPEG1: stereo=32, mono=17 | MPEG2/2.5: stereo=17, mono=9
+        const sideInfo = (mpegVer === 3) ? (chanMode === 3 ? 17 : 32)
+                                         : (chanMode === 3 ?  9 : 17);
+        const xingPos  = i + 4 + sideInfo;
+
+        // Check for Xing/Info VBR header → gives us the exact average bitrate
+        if (xingPos + 8 < n) {
+            const tag = buf.toString('ascii', xingPos, xingPos + 4);
+            if (tag === 'Xing' || tag === 'Info') {
+                const flags = buf.readUInt32BE(xingPos + 4);
+                let p = xingPos + 8;
+                let totalFrames = 0, totalBytes = 0;
+                if ((flags & 1) && p + 4 <= n) { totalFrames = buf.readUInt32BE(p); p += 4; }
+                if ((flags & 2) && p + 4 <= n) { totalBytes  = buf.readUInt32BE(p); }
+                if (totalFrames > 0 && totalBytes > 0) {
+                    // avgKbps = totalBytes * 8 * sampleRate / (totalFrames * 1152 * 1000)
+                    const avgKbps = Math.round(totalBytes * 8 * sampleRate / (totalFrames * 1152) / 1000);
+                    return Math.max(avgKbps * 125, 16000); // exact VBR avg → bytes/sec
+                }
+                return 40000; // Xing present but incomplete → assume 320kbps
             }
         }
+
+        // No Xing/Info → CBR: this frame's declared bitrate = entire file's bitrate
+        return Math.max(kbps * 125, 16000);
     }
 
-    if (foundBitrates.length === 0) return 40000; // fallback 320kbps (generous)
-    // Use MAX found bitrate — ensures we never send slower than any part of the file
-    const maxKbps = Math.max(...foundBitrates);
-    return maxKbps * 125; // kbps -> bytes/sec
+    return 40000; // safe fallback: 320 kbps
 };
 
 // Detect byte offset where actual MPEG audio frames begin (skipping ID3v2 tag).
