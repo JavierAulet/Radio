@@ -89,6 +89,8 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh; /* mejor en móvil: excluye la barra del navegador */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ─── CLICK OVERLAY ─── */
@@ -102,6 +104,8 @@ body {
   justify-content: center;
   text-align: center;
   padding: 2rem;
+  padding-top: max(2rem, calc(env(safe-area-inset-top) + 1rem));
+  padding-bottom: max(2rem, calc(env(safe-area-inset-bottom) + 1rem));
   box-sizing: border-box;
   background: rgba(0,0,0,0.92);
   backdrop-filter: blur(12px);
@@ -251,6 +255,50 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px;
 }
 
+/* ─── STATS BRIDGE (entre hero y discord) ─── */
+.stats-bridge {
+  background: linear-gradient(180deg, #0c0b14 0%, #0a0a10 100%);
+  border-top: 1px solid rgba(99,102,241,0.18);
+  border-bottom: 1px solid rgba(99,102,241,0.18);
+  padding: 2.5rem 1rem;
+}
+.stats-bridge-inner {
+  max-width: 760px; margin: 0 auto;
+  display: flex; align-items: stretch; gap: 0;
+}
+.stats-bridge-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center;
+  gap: 0.5rem; padding: 1.25rem 1rem;
+  position: relative;
+  transition: background var(--transition-base);
+  border-radius: var(--radius-lg);
+}
+.stats-bridge-item:hover { background: rgba(255,255,255,0.03); }
+.stats-bridge-icon {
+  width: 44px; height: 44px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 0.25rem; flex-shrink: 0;
+}
+.stats-bridge-icon--cyan    { background: rgba(99,102,241,0.15); color: var(--accent-hover); }
+.stats-bridge-icon--green   { background: rgba(34,197,94,0.12);  color: var(--success); }
+.stats-bridge-icon--magenta { background: rgba(192,132,252,0.12); color: var(--neon-magenta); }
+.stats-bridge-val {
+  font-size: 1.6rem; font-weight: 900; line-height: 1;
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.stats-bridge-val--green   { color: var(--success); }
+.stats-bridge-val--magenta { color: var(--neon-magenta); font-size: 1.15rem; }
+.stats-bridge-sub {
+  font-size: 0.68rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.09em;
+}
+.stats-bridge-sep {
+  width: 1px; flex-shrink: 0; align-self: stretch; margin: 0.5rem 0;
+  background: linear-gradient(180deg, transparent, rgba(99,102,241,0.25), transparent);
+}
+
 /* ─── STATS ROW ─── */
 .stats-row {
   display: grid;
@@ -265,11 +313,25 @@ body {
   border-radius: var(--radius-xl);
   background: var(--bg-card);
   border: 1px solid var(--border);
-  transition: border-color var(--transition-base), transform var(--transition-base);
+  position: relative; overflow: hidden;
+  transition: border-color var(--transition-base), transform var(--transition-base), box-shadow var(--transition-base);
 }
-.stat-card:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+.stat-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--card-glow, transparent);
+  opacity: 0; transition: opacity 0.3s;
+  pointer-events: none;
+}
+.stat-card:nth-child(1) { --card-glow: radial-gradient(ellipse at 50% 0%, rgba(0,243,255,0.08) 0%, transparent 70%); }
+.stat-card:nth-child(2) { --card-glow: radial-gradient(ellipse at 50% 0%, rgba(0,255,136,0.08) 0%, transparent 70%); }
+.stat-card:nth-child(3) { --card-glow: radial-gradient(ellipse at 50% 0%, rgba(255,0,229,0.08) 0%, transparent 70%); }
+.stat-card:hover { border-color: var(--border-hover); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+.stat-card:hover::before { opacity: 1; }
+.stat-card:nth-child(1):hover { border-color: rgba(0,243,255,0.3); }
+.stat-card:nth-child(2):hover { border-color: rgba(0,255,136,0.3); }
+.stat-card:nth-child(3):hover { border-color: rgba(255,0,229,0.3); }
 .stat-label {
-  font-size: 0.78rem; font-weight: 800;
+  font-size: 0.82rem; font-weight: 800;
   letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--text-primary);
 }
@@ -284,7 +346,17 @@ body {
 }
 .content-card {
   padding: 1.25rem; display: flex; flex-direction: column; gap: 0.6rem;
+  position: relative; overflow: hidden;
 }
+.content-card::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--card-accent, transparent);
+  border-radius: 2px 2px 0 0;
+}
+.content-card:nth-child(1)::after { background: linear-gradient(90deg, var(--neon-cyan), var(--accent)); }
+.content-card:nth-child(2)::after { background: linear-gradient(90deg, var(--neon-magenta), #a855f7); }
+.content-card:nth-child(3)::after { background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan)); }
+.content-card:nth-child(4)::after { background: linear-gradient(90deg, var(--accent), var(--neon-magenta)); }
 .card-header {
   display: flex; align-items: center; gap: 0.5rem;
   font-size: 0.78rem; font-weight: 700;
@@ -302,17 +374,22 @@ body {
 /* ─── TOP ITEMS ─── */
 .top-item {
   display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.6rem 0.5rem; border-radius: var(--radius-md);
+  padding: 0.65rem 0.5rem; border-radius: var(--radius-md);
   transition: background var(--transition-fast);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
 }
-.top-item:hover { background: rgba(255,255,255,0.03); }
+.top-item:last-child { border-bottom: none; }
+.top-item:hover { background: rgba(255,255,255,0.04); }
 .top-rank {
-  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  width: 30px; height: 30px; border-radius: var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.72rem; font-weight: 700;
+  font-size: 0.75rem; font-weight: 800;
   color: #fff; flex-shrink: 0;
   background: rgba(255,255,255,0.06);
 }
+.top-item:nth-child(1) .top-rank { background: linear-gradient(135deg,#f59e0b,#ef4444); }
+.top-item:nth-child(2) .top-rank { background: linear-gradient(135deg,#94a3b8,#64748b); }
+.top-item:nth-child(3) .top-rank { background: linear-gradient(135deg,#b45309,#92400e); }
 .top-info { flex: 1; min-width: 0; }
 .top-name {
   font-size: 0.83rem; font-weight: 500;
@@ -326,6 +403,8 @@ body {
 .top-plays {
   font-size: 0.72rem; font-family: var(--font-mono);
   color: var(--text-tertiary); flex-shrink: 0;
+  background: rgba(255,255,255,0.05); padding: 0.15rem 0.4rem;
+  border-radius: 4px;
 }
 
 /* ─── SCHEDULE ITEMS ─── */
@@ -421,6 +500,132 @@ body {
 .btn-send:hover { background: var(--accent-hover); }
 
 /* ─── FOOTER ─── */
+/* ─── DISCORD CTA ─── */
+/* ─── DISCORD CTA ─── */
+.discord-cta {
+  position: relative; overflow: hidden;
+  padding: 5rem 2rem;
+  background: linear-gradient(135deg, #0d0d1a 0%, #0e0b1e 50%, #0a0f1a 100%);
+  border-top: 1px solid rgba(88,101,242,0.2);
+  border-bottom: 1px solid rgba(88,101,242,0.2);
+}
+.discord-cta-glow {
+  position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+  width: 700px; height: 300px; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(88,101,242,0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.discord-cta-inner {
+  max-width: 1100px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: 3rem;
+}
+.discord-cta-left { display: flex; flex-direction: column; gap: 1.2rem; }
+.discord-badge-chip {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  background: rgba(88,101,242,0.15); border: 1px solid rgba(88,101,242,0.35);
+  color: #7289da; font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.3rem 0.9rem; border-radius: 50px;
+  width: fit-content;
+}
+.discord-cta-title {
+  font-size: clamp(2rem, 4vw, 3rem); font-weight: 900;
+  line-height: 1.1; color: #fff; letter-spacing: -0.02em;
+}
+.discord-brand { color: #7289da; }
+.discord-cta-sub {
+  color: var(--text-secondary); font-size: 1rem;
+  max-width: 480px; line-height: 1.6;
+}
+.discord-features { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.discord-feature-tag {
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  color: var(--text-secondary); font-size: 0.8rem;
+  padding: 0.3rem 0.75rem; border-radius: 50px;
+}
+.btn-discord {
+  display: inline-flex; align-items: center; gap: 0.65rem;
+  background: #5865F2; color: #fff;
+  padding: 0.85rem 2rem; border-radius: var(--radius-lg);
+  font-size: 1rem; font-weight: 700; text-decoration: none;
+  border: none; cursor: pointer; transition: all 0.2s;
+  box-shadow: 0 4px 24px rgba(88,101,242,0.35);
+  width: fit-content;
+}
+.btn-discord:hover {
+  background: #4752C4;
+  box-shadow: 0 6px 32px rgba(88,101,242,0.55);
+  transform: translateY(-2px);
+}
+.discord-cta-right { display: flex; align-items: center; justify-content: center; }
+.discord-logo-wrap {
+  position: relative; width: 180px; height: 180px;
+  display: flex; align-items: center; justify-content: center;
+}
+.discord-logo-glow {
+  position: absolute; inset: -20px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(88,101,242,0.3) 0%, transparent 70%);
+  animation: discordPulse 3s ease-in-out infinite;
+}
+@keyframes discordPulse {
+  0%,100% { transform: scale(1); opacity: 0.6; }
+  50%      { transform: scale(1.15); opacity: 1; }
+}
+.discord-logo-svg {
+  width: 120px; height: 120px;
+  filter: drop-shadow(0 0 30px rgba(88,101,242,0.6));
+  position: relative; z-index: 1;
+}
+.discord-logo-img {
+  width: 140px; height: auto; object-fit: contain;
+  filter: drop-shadow(0 0 30px rgba(88,101,242,0.5));
+  position: relative; z-index: 1;
+}
+
+/* ─── LISTEN ON ─── */
+.listen-on {
+  padding: 2.5rem 2rem 3rem;
+  text-align: center;
+  background: rgba(255,255,255,0.01);
+  border-bottom: 1px solid var(--border);
+}
+.listen-on-label {
+  color: var(--text-muted); font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.14em;
+  margin-bottom: 1.75rem;
+}
+.listen-on-logos {
+  display: flex; flex-wrap: wrap; gap: 1rem;
+  justify-content: center; align-items: center;
+}
+.listen-on-logo-link {
+  display: flex; align-items: center; justify-content: center;
+  width: 160px; height: 68px;
+  padding: 0.75rem 1.25rem; border-radius: var(--radius-lg);
+  background: rgba(255,255,255,0.95);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  transition: all 0.25s; text-decoration: none;
+  flex-shrink: 0;
+}
+.listen-on-logo-link:hover {
+  background: #fff;
+  border-color: rgba(255,255,255,0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.4);
+}
+.listen-on-logo-img {
+  height: 30px;
+  width: auto;
+  max-width: 120px;
+  object-fit: contain;
+  display: block;
+}
+.listen-on-logo-img.logo-invert {
+  filter: invert(1);
+}
+
 .site-footer {
   margin-top: auto; padding: 1.5rem 2rem;
   display: flex; align-items: center; justify-content: center; gap: 1.5rem;
@@ -560,24 +765,41 @@ body {
 .text-gradient { background: linear-gradient(135deg,#e0e0f0 0%,var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 700; }
 @keyframes fadeInUp { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 
+/* ─── PWA SAFE AREA (iOS notch / Android home bar) ─── */
+@supports (padding: env(safe-area-inset-top)) {
+  .sticky-player {
+    padding-top: max(0.6rem, env(safe-area-inset-top));
+    padding-left:  max(1.5rem, env(safe-area-inset-left));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+  }
+  .pwa-banner {
+    bottom: max(1.2rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  }
+  .toast-container {
+    left: max(1rem, env(safe-area-inset-left));
+  }
+}
+
 /* ─── TABLET ─── */
 @media (max-width: 900px) {
   .content-grid { grid-template-columns: 1fr; padding: 0 1rem 1.5rem; }
   .stats-row { grid-template-columns: repeat(3,1fr); padding: 1rem; gap: 0.75rem; }
   .hero-sub { letter-spacing: 0.25em; }
   .hero-song-text { max-width: 240px; }
+  .discord-cta-inner { grid-template-columns: 1fr; gap: 2rem; }
+  .discord-cta-right { display: none; }
+  .discord-cta { padding: 3rem 1.5rem; }
 }
 
-/* ─── MOBILE ─── */
 @media (max-width: 600px) {
   /* Player */
   .sticky-player { padding: 0.5rem 0.75rem; gap: 0.5rem; }
-  .sp-song { max-width: 130px; font-size: 0.78rem; }
+  .sp-song { max-width: 180px; font-size: 0.78rem; }
   .sp-volume { display: none; }
   .sp-listeners { display: none; }
   .sp-logo { width: 26px; height: 26px; }
 
-  /* Hero — más compacto para que los rankings no queden aplastados */
+  /* Hero */
   .hero-section { min-height: 55vh; }
   .hero-content { gap: 0.5rem; padding: 1.2rem 1rem 0; }
   .hero-sub { letter-spacing: 0.15em; font-size: 0.75rem; }
@@ -586,7 +808,21 @@ body {
   .hero-now-playing { padding: 0.4rem 0.9rem; font-size: 0.78rem; }
   .hero-waves { height: 90px; gap: 2px; padding: 0 0.5rem; }
 
-  /* Stats */
+  /* Stats bridge */
+  .stats-bridge { padding: 1.5rem 0.5rem; }
+  .stats-bridge-inner { max-width: 100%; }
+  .stats-bridge-item { padding: 0.9rem 0.4rem; gap: 0.35rem; }
+  .stats-bridge-icon { width: 36px; height: 36px; }
+  .stats-bridge-val { font-size: 1.2rem; }
+  .stats-bridge-val--magenta { font-size: 0.95rem; }
+  .stats-bridge-sub { font-size: 0.6rem; letter-spacing: 0.05em; }
+
+  /* Logos — 2 por fila en móvil */
+  .listen-on { padding: 2rem 1rem 2.5rem; }
+  .listen-on-logos { gap: 0.75rem; }
+  .listen-on-logo-link { width: calc(50% - 0.375rem); max-width: 160px; height: 60px; }
+
+  /* Stats legacy */
   .stats-row { grid-template-columns: 1fr; padding: 0.75rem; gap: 0.6rem; }
   .stat-card { flex-direction: row; text-align: left; padding: 0.9rem 1rem; gap: 0.8rem; }
 
@@ -603,10 +839,14 @@ body {
   .dashboard-grid { grid-template-columns: 1fr; }
 }
 
-/* ─── SMALL PHONES ─── */
+/* ─── SMALL PHONES (≤ 380px) ─── */
 @media (max-width: 380px) {
-  .sp-song { max-width: 100px; }
+  .sp-song { max-width: 120px; }
   .hero-title { font-size: clamp(2.4rem, 12vw, 3.5rem); }
+  .stats-bridge-val { font-size: 1.05rem; }
+  .stats-bridge-icon { width: 30px; height: 30px; }
+  .listen-on-logo-link { height: 54px; }
+  .listen-on-logo-img { height: 26px; }
   .stats-row { padding: 0.5rem; }
   .content-grid { padding: 0 0.5rem 1rem; }
 }

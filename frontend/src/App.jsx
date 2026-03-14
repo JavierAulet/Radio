@@ -255,6 +255,25 @@ function RadioPlayer() {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [isPlaying]);
 
+  // Buffer watchdog — evita que el stream se adelante tras horas de escucha
+  useEffect(() => {
+    const MAX_AHEAD = 18; // segundos máximos de buffer adelantado
+    const id = setInterval(() => {
+      const audio = audioRef.current;
+      if (!audio || !isPlayingRef.current || !userHasInteracted.current) return;
+      try {
+        if (!audio.buffered || audio.buffered.length === 0) return;
+        const ahead = audio.buffered.end(audio.buffered.length - 1) - audio.currentTime;
+        if (ahead > MAX_AHEAD) {
+          srcChangedAt.current = Date.now();
+          audio.src = `${STREAM_URL}?t=${Date.now()}`;
+          audio.play().catch(() => {});
+        }
+      } catch (_) {}
+    }, 12000);
+    return () => clearInterval(id);
+  }, []);
+
   // PWA install
   useEffect(() => {
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -392,157 +411,86 @@ function RadioPlayer() {
         </div>
       </section>
 
-      {/* ── STATS ── */}
-      <section className="stats-row">
-        {[
-          { icon: <Radio size={28} color="var(--neon-cyan)" />, label: '24/7 EN VIVO', sub: 'Música sin parar' },
-          { icon: <Users size={28} color="var(--neon-green)" />, label: `${listenerCount} OYENTES`, sub: 'Ahora en línea' },
-          { icon: <Mic2 size={28} color="var(--neon-magenta)" />, label: 'DJs EN VIVO', sub: 'Los mejores DJs urbanos' },
-        ].map((s, i) => (
-          <div key={i} className="stat-card glass-panel">
-            {s.icon}
-            <div className="stat-label">{s.label}</div>
-            <div className="stat-sub">{s.sub}</div>
+      {/* ── STATS INTEGRADAS ── */}
+      <section className="stats-bridge">
+        <div className="stats-bridge-inner">
+          <div className="stats-bridge-item">
+            <div className="stats-bridge-icon stats-bridge-icon--cyan"><Radio size={20} /></div>
+            <div className="stats-bridge-val">24/7</div>
+            <div className="stats-bridge-sub">En Vivo</div>
           </div>
-        ))}
+          <div className="stats-bridge-sep" />
+          <div className="stats-bridge-item">
+            <div className="stats-bridge-icon stats-bridge-icon--green"><Users size={20} /></div>
+            <div className="stats-bridge-val stats-bridge-val--green">{listenerCount}</div>
+            <div className="stats-bridge-sub">Oyentes ahora</div>
+          </div>
+          <div className="stats-bridge-sep" />
+          <div className="stats-bridge-item">
+            <div className="stats-bridge-icon stats-bridge-icon--magenta"><Mic2 size={20} /></div>
+            <div className="stats-bridge-val stats-bridge-val--magenta">
+              {radioInfo.isDjLive ? radioInfo.djName || 'DJ' : 'AutoDJ'}
+            </div>
+            <div className="stats-bridge-sub">En directo</div>
+          </div>
+        </div>
       </section>
 
-      {/* ── CONTENT GRID ── */}
-      <div className="content-grid">
-
-        {/* Top Canciones */}
-        <div className="glass-panel content-card">
-          <div className="card-header">
-            <TrendingUp size={16} color="var(--neon-cyan)" />
-            <span>Top Canciones · Esta semana</span>
-          </div>
-          {topSongs.length === 0 ? (
-            <p className="empty-hint">Las canciones más escuchadas aparecerán aquí.</p>
-          ) : topSongs.map((s, i) => (
-            <div key={i} className="top-item">
-              <div className="top-rank" style={{ background: i < 3 ? 'linear-gradient(135deg,var(--neon-cyan),var(--neon-magenta))' : 'rgba(255,255,255,0.06)' }}>
-                {i + 1}
-              </div>
-              <div className="top-info">
-                <div className="top-name">{s.song_name.replace(/\.mp3$/i, '').replace(/^\d+\s*-\s*\w+\s*-\s*/, '')}</div>
-                {s.artist_name && <div className="top-artist">{s.artist_name}</div>}
-              </div>
-              <div className="top-plays">{s.plays}×</div>
+      {/* ── DISCORD CTA ── */}
+      <section className="discord-cta">
+        <div className="discord-cta-glow" />
+        <div className="discord-cta-inner">
+          <div className="discord-cta-left">
+            <div className="discord-badge-chip">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.03.056a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+              Bot Oficial
             </div>
+            <h2 className="discord-cta-title">
+              ESCUCHA <span className="discord-brand">URBANOVA</span><br />
+              EN TU SERVIDOR <span className="discord-brand">DISCORD</span>
+            </h2>
+            <p className="discord-cta-sub">
+              Añade nuestro bot a tu servidor y disfruta de Urbanova Radio en directo con tu comunidad. Música urbana 24/7 al alcance de un comando.
+            </p>
+            <div className="discord-features">
+              {['🎵 Stream 24/7 en vivo','🎙️ DJs en directo','📻 AutoDJ siempre activo'].map(f => (
+                <span key={f} className="discord-feature-tag">{f}</span>
+              ))}
+            </div>
+            <a
+              href="https://discord.com/oauth2/authorize?client_id=1482117598501146644&permissions=3147776&integration_type=0&scope=bot"
+              target="_blank" rel="noopener noreferrer"
+              className="btn-discord"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.03.056a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+              Añadir a Discord
+            </a>
+          </div>
+          <div className="discord-cta-right">
+            <div className="discord-logo-wrap">
+              <div className="discord-logo-glow" />
+              <img src="/logos/discord-logo.png" alt="Discord" className="discord-logo-img" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── DISPONIBLE EN ── */}
+      <section className="listen-on">
+        <p className="listen-on-label">También nos puedes escuchar en</p>
+        <div className="listen-on-logos">
+          {[
+            { name: 'Streema',        logo: '/logos/logo-streema.png',          href: 'https://es.streema.com/radios/Urbanova_Radio',             invert: true },
+            { name: 'MyTuner Radio',  logo: '/logos/mytuner-logo.png',          href: 'https://mytuner-radio.com/es/emisora/urbanova-radio-518500/' },
+            { name: 'TuneIn',         logo: '/logos/TuneIn-Logo.png',           href: 'https://tunein.com/radio/Urbanova-Radio-s353937/' },
+            { name: 'OnlineRadioBox', logo: '/logos/onlineradiobox-logo.png',   href: 'https://onlineradiobox.com/es/urbanova/?cs=es.urbanova' },
+          ].map(p => (
+            <a key={p.name} href={p.href} target="_blank" rel="noopener noreferrer" className="listen-on-logo-link" title={p.name}>
+              <img src={p.logo} alt={p.name} className={`listen-on-logo-img${p.invert ? ' logo-invert' : ''}`} />
+            </a>
           ))}
         </div>
-
-        {/* Top Artistas */}
-        <div className="glass-panel content-card">
-          <div className="card-header">
-            <Mic2 size={16} color="var(--neon-magenta)" />
-            <span>Top Artistas · Esta semana</span>
-          </div>
-          {topArtists.length === 0 ? (
-            <p className="empty-hint">Los artistas más sonados aparecerán aquí.</p>
-          ) : topArtists.map((a, i) => (
-            <div key={i} className="top-item">
-              <div className="top-rank" style={{ background: i < 3 ? 'linear-gradient(135deg,var(--neon-magenta),var(--neon-cyan))' : 'rgba(255,255,255,0.06)' }}>
-                {i + 1}
-              </div>
-              <div className="top-info">
-                <div className="top-name">{a.artist_name}</div>
-
-              </div>
-              <div className="top-plays" style={{ color: 'var(--neon-magenta)' }}>🎤</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Programación */}
-        <div className="glass-panel content-card">
-          <div className="card-header">
-            <Clock size={16} color="var(--neon-green)" />
-            <span>Programación</span>
-          </div>
-          {schedules.length === 0 ? (
-            <p className="empty-hint">Programación en construcción — ¡sigue disfrutando la música!</p>
-          ) : schedules.map(s => (
-            <div key={s.id} className="schedule-item">
-              <div className="schedule-day">{DAYS[s.day_of_week]}</div>
-              <div className="schedule-info">
-                <div className="schedule-name">{s.show_name}</div>
-                <div className="schedule-dj">🎧 {s.display_name}</div>
-              </div>
-              <div className="schedule-time">{s.start_time}–{s.end_time}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Chat + Historial */}
-        <div className="glass-panel content-card chat-card">
-          <div className="tabs-row">
-            {[
-              { key: 'chat', label: 'Chat', icon: <MessageSquare size={14}/> },
-              { key: 'history', label: 'Historial', icon: <Clock size={14}/> },
-            ].map(t => (
-              <button key={t.key} onClick={() => setActiveTab(t.key)}
-                className={`tab-btn ${activeTab === t.key ? 'active' : ''}`}>
-                {t.icon} {t.label}
-              </button>
-            ))}
-            <div className="tab-user">
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{username}</span>
-              <span style={{ color: 'var(--neon-cyan)', fontSize: '0.72rem', fontWeight: 700 }}>Lvl {userLevel}</span>
-            </div>
-          </div>
-
-          {activeTab === 'chat' && (
-            <>
-              <div className="chat-messages" ref={chatContainerRef}>
-                {chatMessages.map(msg => (
-                  <div key={msg.id} className="chat-message">
-                    <div className="avatar" style={{
-                      background: msg.user === 'Sistema' ? 'rgba(100,100,120,0.5)' : `linear-gradient(135deg,${getUserColor(msg.user)},${getUserColor(msg.user)}88)`,
-                    }}>{msg.user.charAt(0).toUpperCase()}</div>
-                    <div className="msg-content">
-                      <div className="msg-header">
-                        <span className="msg-username" style={{ color: msg.user === 'Sistema' ? 'var(--text-muted)' : getUserColor(msg.user) }}>
-                          {msg.user}
-                          {msg.level && msg.user !== 'Sistema' && <span style={{ fontSize: '0.6rem', color: 'var(--text-subtle)', marginLeft: 4 }}>Lvl {msg.level}</span>}
-                        </span>
-                        <span className="msg-time">{msg.time}</span>
-                      </div>
-                      <div className="msg-text" style={{ color: msg.user === 'Sistema' ? 'var(--text-muted)' : undefined, fontStyle: msg.user === 'Sistema' ? 'italic' : undefined }}>{msg.text}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <form className="chat-input-container" onSubmit={sendMessage}>
-                <input type="text" className="chat-input" placeholder="Escribe un mensaje..."
-                  value={currentMessage} onChange={e => setCurrentMessage(e.target.value)} maxLength={200} />
-                <button type="submit" className="btn-send"><Send size={14} /></button>
-              </form>
-            </>
-          )}
-
-          {activeTab === 'history' && (
-            <div className="chat-messages">
-              {(radioInfo.history && radioInfo.history.length > 0) ? radioInfo.history.map((song, i) => (
-                <div key={i} className="top-item" style={{ marginBottom: '0.35rem' }}>
-                  <div className="top-rank" style={{ background: i === 0 ? 'linear-gradient(135deg,var(--neon-cyan),var(--neon-magenta))' : 'rgba(255,255,255,0.06)' }}>
-                    {i === 0 ? '▶' : i}
-                  </div>
-                  <div className="top-info">
-                    <div className="top-name" style={{ fontWeight: i === 0 ? 600 : 400 }}>{song}</div>
-                    {i === 0 && <div className="top-artist" style={{ color: 'var(--neon-cyan)' }}>SONANDO AHORA</div>}
-                  </div>
-                </div>
-              )) : (
-                <div style={{ textAlign: 'center', color: 'var(--text-subtle)', fontSize: '0.82rem', padding: '2rem 0' }}>
-                  El historial aparecerá aquí.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-      </div>
+      </section>
 
       {/* Footer */}
       <footer className="site-footer">
