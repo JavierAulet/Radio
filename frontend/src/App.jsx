@@ -82,9 +82,9 @@ function RadioPlayer() {
     if (Hls.isSupported()) {
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
       const hls = new Hls({
-        liveSyncDurationCount:       3,   // 3 segmentos de 2s = 6s detrás del vivo
+        liveSyncDurationCount:       3,   // 3 segmentos de 1s = 3s detrás del vivo
         liveMaxLatencyDurationCount: 6,
-        maxBufferLength:             12,
+        maxBufferLength:             8,
         enableWorker:                true,
       });
       hlsRef.current = hls;

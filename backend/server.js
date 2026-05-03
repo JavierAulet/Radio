@@ -38,8 +38,8 @@ const startFfmpeg = () => {
         '-ac',   '2',
         '-ar',   '44100',
         '-f',    'hls',
-        '-hls_time',             '2',
-        '-hls_list_size',        '5',
+        '-hls_time',             '1',
+        '-hls_list_size',        '8',
         '-hls_flags',            'delete_segments+append_list+omit_endlist',
         '-hls_segment_filename', path.join(hlsDir, 'seg%05d.ts'),
         '-y',
@@ -158,7 +158,7 @@ const addToHistory = (song) => {
 // This eliminates setInterval drift — if a tick fires late, the next one catches up.
 const TICK_MS = 50;                  // smaller tick = finer compensation
 const MAX_BURST_BYTES = 65536;       // 64KB cap per tick — allows fast catch-up
-const SPEED_FACTOR = 1.05;           // send 5% faster than real-time to build client buffer
+const SPEED_FACTOR = 1.0;            // real-time rate — hls.js gestiona su propio buffer
 
 let playlist = [];            // Cola de reproducción pendiente (nombres de archivo)
 let playedSongs = new Set();  // Canciones ya reproducidas en el ciclo actual
