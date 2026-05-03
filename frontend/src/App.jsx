@@ -2,11 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Play, Pause, Volume2, VolumeX, MessageSquare, Send, Settings, Radio, Users, Clock, Music, Mic2, TrendingUp, Bell, Share2 } from 'lucide-react';
 import { io } from 'socket.io-client';
+import Hls from 'hls.js';
 import DjDashboard from './DjDashboard';
 import AdminDashboard from './AdminDashboard';
 
 const socket = io();
-const STREAM_URL = '/stream';
+const HLS_URL = '/hls/stream.m3u8';
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 // ── Wave bars animation ─────────────────────────────────────────────────────
@@ -68,70 +69,62 @@ function RadioPlayer() {
   const chatContainerRef = useRef(null);
   const isPlayingRef     = useRef(false);
   const userHasInteracted = useRef(false);
-  const srcChangedAt     = useRef(0);
-  const reconnectStream  = useRef(null);
-  const reconnectTimer   = useRef(null);
-  const reconnectCount   = useRef(0);
-  const MAX_RECONNECTS   = 8;
+  const hlsRef           = useRef(null);
+  const startHlsRef      = useRef(null);
 
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
-  const doReconnect = () => {
-    if (!audioRef.current || !userHasInteracted.current) return;
-    if (reconnectCount.current >= MAX_RECONNECTS) return;
-    clearTimeout(reconnectTimer.current);
-    reconnectCount.current++;
-    reconnectTimer.current = setTimeout(() => {
-      if (!audioRef.current) return;
-      srcChangedAt.current = Date.now();
-      audioRef.current.src = `${STREAM_URL}?t=${Date.now()}`;
-      audioRef.current.load();
-      audioRef.current.play().catch(() => {});
-    }, 2000);
-  };
-  reconnectStream.current = doReconnect;
-
-  // Autoplay
-  useEffect(() => {
+  // startHls: arranca (o reinicia) el stream HLS en el elemento <audio>
+  const startHls = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    const isStandalone = window.navigator.standalone === true ||
-      window.matchMedia('(display-mode: standalone)').matches;
-    srcChangedAt.current = Date.now();
-    audio.src = `${STREAM_URL}?t=${Date.now()}`;
-    audio.volume = 0.7;
-    audio.play()
-      .then(() => { setIsPlaying(true); setNeedsClick(false); userHasInteracted.current = true; })
-      .catch(() => {
-        if (!isStandalone) setNeedsClick(true);
-        else setTimeout(() => {
-          audio.play().then(() => { setIsPlaying(true); userHasInteracted.current = true; }).catch(() => setNeedsClick(true));
-        }, 800);
+
+    if (Hls.isSupported()) {
+      if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
+      const hls = new Hls({
+        liveSyncDurationCount:       3,   // 3 segmentos de 2s = 6s detrás del vivo
+        liveMaxLatencyDurationCount: 6,
+        maxBufferLength:             12,
+        enableWorker:                true,
       });
-    const onError = () => {
-      if (Date.now() - srcChangedAt.current < 1000) return;
-      if (reconnectStream.current) reconnectStream.current();
-    };
-    const onPlaying = () => { reconnectCount.current = 0; };
-    audio.addEventListener('error', onError);
-    audio.addEventListener('playing', onPlaying);
-    return () => {
-      audio.removeEventListener('error', onError);
-      audio.removeEventListener('playing', onPlaying);
-      clearTimeout(reconnectTimer.current);
-    };
+      hlsRef.current = hls;
+      hls.loadSource(HLS_URL);
+      hls.attachMedia(audio);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        audio.volume = volume;
+        audio.play()
+          .then(() => { setIsPlaying(true); setNeedsClick(false); userHasInteracted.current = true; })
+          .catch(() => setNeedsClick(true));
+      });
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (!data.fatal) return;
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+        else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        else setTimeout(() => startHlsRef.current?.(), 2000);
+      });
+    } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari / iOS — HLS nativo
+      audio.src = HLS_URL;
+      audio.volume = volume;
+      audio.load();
+      audio.play()
+        .then(() => { setIsPlaying(true); setNeedsClick(false); userHasInteracted.current = true; })
+        .catch(() => setNeedsClick(true));
+    }
+  };
+  startHlsRef.current = startHls;
+
+  // Autoplay al montar
+  useEffect(() => {
+    startHlsRef.current?.();
+    return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; } };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startFromClick = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
     userHasInteracted.current = true;
     setNeedsClick(false);
-    srcChangedAt.current = Date.now();
-    audio.src = `${STREAM_URL}?t=${Date.now()}`;
-    audio.play().then(() => setIsPlaying(true)).catch(() => {
-      setTimeout(() => { audioRef.current?.play().catch(() => {}); }, 1000);
-    });
+    startHlsRef.current?.();
   };
 
   // Socket
@@ -163,33 +156,6 @@ function RadioPlayer() {
     };
   }, []);
 
-  // Crossfade AutoDJ ↔ DJ
-  const prevIsDjLive = useRef(null);
-  useEffect(() => {
-    if (prevIsDjLive.current === null) { prevIsDjLive.current = radioInfo.isDjLive; return; }
-    if (prevIsDjLive.current === radioInfo.isDjLive) return;
-    prevIsDjLive.current = radioInfo.isDjLive;
-    if (!audioRef.current || !isPlayingRef.current) return;
-    const audio = audioRef.current;
-    const targetVol = audio.volume || volume;
-    let cur = targetVol;
-    const fadeOut = setInterval(() => {
-      cur = Math.max(0, cur - 0.05);
-      audio.volume = cur;
-      if (cur <= 0) {
-        clearInterval(fadeOut);
-        srcChangedAt.current = Date.now();
-        audio.src = `${STREAM_URL}?t=${Date.now()}`;
-        audio.play().catch(() => {});
-        let v2 = 0;
-        const fadeIn = setInterval(() => {
-          v2 = Math.min(targetVol, v2 + 0.05);
-          audio.volume = v2;
-          if (v2 >= targetVol) clearInterval(fadeIn);
-        }, 30);
-      }
-    }, 30);
-  }, [radioInfo.isDjLive]);
 
   // Chat scroll
   useEffect(() => {
@@ -255,24 +221,6 @@ function RadioPlayer() {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [isPlaying]);
 
-  // Buffer watchdog — evita que el stream se adelante tras horas de escucha
-  useEffect(() => {
-    const MAX_AHEAD = 18; // segundos máximos de buffer adelantado
-    const id = setInterval(() => {
-      const audio = audioRef.current;
-      if (!audio || !isPlayingRef.current || !userHasInteracted.current) return;
-      try {
-        if (!audio.buffered || audio.buffered.length === 0) return;
-        const ahead = audio.buffered.end(audio.buffered.length - 1) - audio.currentTime;
-        if (ahead > MAX_AHEAD) {
-          srcChangedAt.current = Date.now();
-          audio.src = `${STREAM_URL}?t=${Date.now()}`;
-          audio.play().catch(() => {});
-        }
-      } catch (_) {}
-    }, 12000);
-    return () => clearInterval(id);
-  }, []);
 
   // PWA install
   useEffect(() => {
@@ -304,15 +252,14 @@ function RadioPlayer() {
   };
 
   const togglePlay = () => {
-    if (!audioRef.current) return;
     userHasInteracted.current = true;
-    if (isPlaying) { audioRef.current.pause(); }
-    else {
-      srcChangedAt.current = Date.now();
-      audioRef.current.src = `${STREAM_URL}?t=${Date.now()}`;
-      audioRef.current.play().catch(() => {});
+    if (isPlaying) {
+      audioRef.current?.pause();
+      setIsPlaying(false);
+    } else {
+      // Reconectar al directo desde la posición actual de la playlist
+      startHlsRef.current?.();
     }
-    setIsPlaying(p => !p);
   };
 
   const handleVolumeChange = e => {

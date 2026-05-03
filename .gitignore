@@ -24,6 +24,9 @@ backend/music/*.mp3
 backend/music/*.wav
 backend/music/*.flac
 
+# HLS segments (generated at runtime by ffmpeg)
+backend/hls/
+
 # OS generated files
 .DS_Store
 .DS_Store?

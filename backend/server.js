@@ -4,12 +4,80 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 
 const { getUser, createUser, addXP, authenticateDj, getSchedules, addSchedule, deleteSchedule, getScheduleById, getAllDjs, createDj, deleteDj, logPlay, getTopSongs, getTopArtists } = require('./database');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ── HLS output directory ────────────────────────────────────────────────────
+const hlsDir = path.join(__dirname, 'hls');
+if (!fs.existsSync(hlsDir)) fs.mkdirSync(hlsDir, { recursive: true });
+
+let ffmpegProcess = null;
+let ffmpegStdin   = null;
+
+const startFfmpeg = () => {
+    if (ffmpegProcess) {
+        try { ffmpegProcess.kill('SIGTERM'); } catch(e) {}
+        ffmpegProcess = null;
+        ffmpegStdin   = null;
+    }
+
+    const ffmpegBin = process.env.FFMPEG_PATH
+        || (process.platform === 'win32'
+            ? 'C:\\Users\\Usuario\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe'
+            : 'ffmpeg');
+    ffmpegProcess = spawn(ffmpegBin, [
+        '-f',    'mp3',
+        '-i',    'pipe:0',
+        '-c:a',  'aac',
+        '-b:a',  '128k',
+        '-ac',   '2',
+        '-ar',   '44100',
+        '-f',    'hls',
+        '-hls_time',             '2',
+        '-hls_list_size',        '5',
+        '-hls_flags',            'delete_segments+append_list+omit_endlist',
+        '-hls_segment_filename', path.join(hlsDir, 'seg%05d.ts'),
+        '-y',
+        path.join(hlsDir, 'stream.m3u8')
+    ], { stdio: ['pipe', 'ignore', 'pipe'] });
+
+    ffmpegStdin = ffmpegProcess.stdin;
+    ffmpegProcess.stderr.on('data', () => {}); // silenciar output de progreso
+
+    ffmpegProcess.on('error', (err) => {
+        ffmpegStdin   = null;
+        ffmpegProcess = null;
+        if (err.code === 'ENOENT') {
+            console.error(`❌ ffmpeg no encontrado en: ${ffmpegBin}`);
+        } else {
+            console.error('ffmpeg error:', err.message);
+            setTimeout(startFfmpeg, 2000);
+        }
+    });
+
+    ffmpegProcess.on('close', (code) => {
+        ffmpegStdin   = null;
+        ffmpegProcess = null;
+        if (code !== 0 && code !== null) {
+            console.warn(`⚠️  ffmpeg salió (${code}), reiniciando en 2s...`);
+            setTimeout(startFfmpeg, 2000);
+        }
+    });
+
+    console.log('🎬 ffmpeg HLS iniciado');
+};
+
+// Servir segmentos HLS con cabeceras adecuadas
+app.use('/hls', (req, res, next) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', req.path.endsWith('.m3u8') ? 'no-cache, no-store' : 'max-age=10');
+    next();
+}, express.static(hlsDir));
 
 // Servir el frontend compilado en producción
 const distPath = path.join(__dirname, '../frontend/dist');
@@ -307,6 +375,11 @@ const pushToRingBuffer = (chunk) => {
 };
 
 const broadcastChunk = (chunk) => {
+    // HLS pipeline — todos los oyentes browser quedan sincronizados
+    if (ffmpegStdin && !ffmpegStdin.destroyed) {
+        try { ffmpegStdin.write(chunk); } catch(e) {}
+    }
+    // Icecast /stream — para directorios externos (TuneIn, Streema, etc.)
     pushToRingBuffer(chunk);
     const dead = [];
     activeListeners.forEach(res => {
@@ -474,7 +547,8 @@ const playNextAutoDjTrack = () => {
     }, TICK_MS);
 };
 
-// Inicializar el AutoDJ
+// Inicializar HLS y AutoDJ
+startFfmpeg();
 loadPlaylist();
 loadAds();
 setTimeout(playNextAutoDjTrack, 2000);
@@ -635,12 +709,16 @@ async function handleBroadcast(req, res) {
     // Ahora el socket es nuestro — recibimos el stream de audio directamente
     socket.on('data', (chunk) => {
         if (!djStarted) {
-            // Primer chunk del DJ: ahora sí paramos el AutoDJ (transición sin gap)
             djStarted = true;
             stopAutoDj();
             console.log(`🎙️ DJ ${encoderName}: primer chunk recibido, AutoDJ detenido.`);
         }
         lastDjDataAt = Date.now();
+        // HLS pipeline
+        if (ffmpegStdin && !ffmpegStdin.destroyed) {
+            try { ffmpegStdin.write(chunk); } catch(e) {}
+        }
+        // Icecast listeners
         activeListeners.forEach(clientRes => {
             try { clientRes.write(chunk); } catch(e) {}
         });
@@ -929,4 +1007,12 @@ const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => {
   console.log(`🚀 Servidor backend de Urbanova Radio corriendo en http://localhost:${PORT}`);
   console.log(`🎧 Endpoint de Escucha: GET http://localhost:${PORT}/stream`);
+});
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ El puerto ${PORT} ya está en uso. Cierra el otro proceso e inténtalo de nuevo.`);
+    process.exit(1);
+  } else {
+    throw err;
+  }
 });
