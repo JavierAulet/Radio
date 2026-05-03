@@ -29,7 +29,7 @@ const startFfmpeg = () => {
     const ffmpegBin = process.env.FFMPEG_PATH
         || (process.platform === 'win32'
             ? 'C:\\Users\\Usuario\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe'
-            : 'ffmpeg');
+            : '/usr/bin/ffmpeg');
     ffmpegProcess = spawn(ffmpegBin, [
         '-f',    'mp3',
         '-i',    'pipe:0',
