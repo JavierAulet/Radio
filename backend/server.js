@@ -555,26 +555,38 @@ setTimeout(playNextAutoDjTrack, 2000);
 
 // Timestamp del último dato recibido del DJ (0 = no hay DJ activo)
 let lastDjDataAt = 0;
+let currentDjSocket = null; // referencia al socket del DJ activo
 const DJ_DATA_TIMEOUT_MS = 6000; // 6s sin datos → DJ considerado desconectado
 
 // Watchdog: comprueba cada 2s
 setInterval(() => {
+    // ffmpeg muerto sin razón → reiniciar
+    if (!ffmpegProcess) {
+        console.warn('Watchdog: ffmpeg no está corriendo, reiniciando...');
+        startFfmpeg();
+    }
     // AutoDJ muerto sin razón → reiniciar
     if (!radioState.isDjLive && autoDjTimer === null && playlist.length > 0) {
         console.warn('Watchdog: AutoDJ timer muerto, reiniciando...');
         playNextAutoDjTrack();
         return;
     }
-    // DJ "live" pero sin datos por más de 10s → forzar desconexión
+    // DJ "live" pero sin datos por más de 6s → forzar desconexión
     if (radioState.isDjLive && lastDjDataAt > 0 && Date.now() - lastDjDataAt > DJ_DATA_TIMEOUT_MS) {
         console.warn('Watchdog: DJ timeout sin datos — forzando desconexión y reiniciando AutoDJ');
         lastDjDataAt = 0;
+        // Destruir el socket del DJ para evitar que siga abierto
+        if (currentDjSocket) {
+            try { currentDjSocket.destroy(); } catch(e) {}
+            currentDjSocket = null;
+        }
         radioState.isDjLive = false;
         radioState.djName = null;
         radioState.currentSong = "Cargando AutoDJ...";
         io.emit('radioData', radioState);
         io.emit('systemMessage', { text: "🎙️ El DJ se ha desconectado. Regresando a la programación habitual.", isError: false });
-        playNextAutoDjTrack();
+        startFfmpeg(); // reiniciar ffmpeg limpio antes de reanudar AutoDJ
+        setTimeout(playNextAutoDjTrack, 500);
     }
 }, 2000);
 
@@ -672,6 +684,7 @@ async function handleBroadcast(req, res) {
     io.emit('systemMessage', { text: `🎙️ ¡Un DJ se ha conectado (${encoderName}) y estamos EN VIVO!`, isError: false });
 
     const socket = req.socket;
+    currentDjSocket = socket;
     socket.setTimeout(0);
 
     // Respuesta IceCast pura antes de desconectar el parser HTTP
@@ -696,13 +709,15 @@ async function handleBroadcast(req, res) {
         if (isDisconnected) return;
         isDisconnected = true;
         lastDjDataAt = 0;
+        currentDjSocket = null;
         console.log('🎙️ === DJ DESCONECTADO: RETORNANDO A AutoDJ === 🎙️');
         radioState.isDjLive = false;
         radioState.djName = null;
         radioState.currentSong = "Cargando AutoDJ...";
         io.emit('radioData', radioState);
         io.emit('systemMessage', { text: "🎙️ El DJ se ha desconectado. Regresando a la programación habitual.", isError: false });
-        playNextAutoDjTrack();
+        startFfmpeg();
+        setTimeout(playNextAutoDjTrack, 500);
         try { socket.destroy(); } catch(e) {}
     };
 
